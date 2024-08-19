@@ -1,7 +1,7 @@
 {
   "name": "my-react-app",
   "version": "0.1.0",
-  "private": false,
+  "private": true,
   "homepage": "/",
   "dependencies": {
     "@ag-grid-community/client-side-row-model": "^31.3.2",
