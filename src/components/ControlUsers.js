@@ -18,6 +18,15 @@ import {
   faLockOpen,
 } from "@fortawesome/free-solid-svg-icons";
 import { useTheme } from "./ThemeContext";
+import { baseUrl } from "./config"; // Importing baseUrl from config
+
+const roleDescriptions = {
+  A: "Admin",
+  O: "Operator",
+  P: "Pumper",
+  R: "Read Only",
+  I: "Investor",
+};
 
 const ControlUsers = () => {
   const [users, setUsers] = useState([]);
@@ -26,27 +35,14 @@ const ControlUsers = () => {
   const [filterRole, setFilterRole] = useState("All");
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState("asc");
-  const [subdomain, setSubdomain] = useState("");
   const { theme } = useTheme();
 
   useEffect(() => {
-    const extractSubdomain = () => {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      setSubdomain(parts.length > 2 ? parts[0] : "");
-    };
-    extractSubdomain();
-  }, []);
-
-  useEffect(() => {
     fetchUsers();
-  }, [subdomain]);
+  }, []);
 
   const fetchUsers = async () => {
     try {
-      const baseUrl = subdomain
-        ? `https://${subdomain}.ogfieldticket.com`
-        : "https://beta.ogpumper.net";
       const response = await axios.get(`${baseUrl}/api/userdetails.php`);
       setUsers(response.data.users || []);
     } catch (error) {
@@ -64,9 +60,6 @@ const ControlUsers = () => {
 
   const handleSave = async (updatedUserData) => {
     try {
-      const baseUrl = subdomain
-        ? `https://${subdomain}.ogfieldticket.com`
-        : "https://beta.ogpumper.net";
       const response = await axios.patch(
         `${baseUrl}/api/userdetails.php`,
         updatedUserData
@@ -88,9 +81,6 @@ const ControlUsers = () => {
 
   const handleDisable = async (userId) => {
     try {
-      const baseUrl = subdomain
-        ? `https://${subdomain}.ogfieldticket.com`
-        : "https://beta.ogpumper.net";
       const response = await axios.patch(`${baseUrl}/api/userdetails.php`, {
         UserID: userId,
         Action: "disable",
@@ -118,9 +108,6 @@ const ControlUsers = () => {
 
   const handleEnable = async (userId) => {
     try {
-      const baseUrl = subdomain
-        ? `https://${subdomain}.ogfieldticket.com`
-        : "https://beta.ogpumper.net";
       const response = await axios.patch(`${baseUrl}/api/userdetails.php`, {
         UserID: userId,
         Action: "enable",
@@ -299,7 +286,9 @@ const ControlUsers = () => {
                         icon={faUser}
                         className="mr-2 text-gray-500"
                       />
-                      <span className="font-medium">{user.Role}</span>
+                      <span className="font-medium">
+                        {roleDescriptions[user.Role] || user.Role}
+                      </span>
                     </p>
                     <p className="flex items-center">
                       <FontAwesomeIcon
@@ -397,14 +386,6 @@ const EditUserForm = ({ user, onSave, onCancel }) => {
         setIsSubmitting(false);
       }
     }
-  };
-
-  const roleDescriptions = {
-    A: "Admin",
-    O: "Operator",
-    P: "Pumper",
-    R: "Read Only",
-    I: "Investor",
   };
 
   const fields = [

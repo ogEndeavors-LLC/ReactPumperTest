@@ -11,6 +11,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { baseUrl } from "./config"; // Import baseUrl from config
 
 function UserProfile() {
   const { theme } = useTheme();
@@ -21,43 +22,12 @@ function UserProfile() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [subdomain, setSubdomain] = useState("");
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    const extractSubdomain = () => {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      if (parts.length > 2) {
-        const subdomainPart = parts.shift();
-        console.log(`sub domain ${subdomainPart}`);
-        setSubdomain(subdomainPart);
-      } else {
-        console.log(`sub domain ${parts}`);
-        setSubdomain("");
-      }
-    };
-
-    extractSubdomain();
-  }, []);
-
-  useEffect(() => {
     const fetchUserDetails = async () => {
       try {
-        const hostname = window.location.hostname;
-        const parts = hostname.split(".");
-        let baseUrl;
-
-        if (parts.length > 2) {
-          const subdomainPart = parts.shift();
-          baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-          console.log(`Using subdomain URL: ${baseUrl}`);
-        } else {
-          baseUrl = "https://beta.ogpumper.net";
-          console.log(`Using default URL: ${baseUrl}`);
-        }
-
         const response = await axios.get(
           `${baseUrl}/api/userdetails.php?id=${userID}`
         );
@@ -77,7 +47,7 @@ function UserProfile() {
     if (userID) {
       fetchUserDetails();
     }
-  }, [userID, subdomain]);
+  }, [userID]);
 
   const handleEditProfile = () => {
     setEditMode(true);
@@ -85,18 +55,6 @@ function UserProfile() {
 
   const handleSaveProfile = async () => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      let baseUrl;
-
-      if (parts.length > 2) {
-        const subdomainPart = parts.shift();
-        baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-        console.log(`Using subdomain URL: ${baseUrl}`);
-      } else {
-        baseUrl = "https://beta.ogpumper.net";
-        console.log(`Using default URL: ${baseUrl}`);
-      }
       const response = await fetch(`${baseUrl}/api/userdetails.php`, {
         method: "PATCH",
         headers: {
@@ -111,12 +69,13 @@ function UserProfile() {
           setUser(editedUser);
           setEditMode(false);
         } else {
+          console.error("Error saving user profile:", data.message);
         }
       } else {
-        console.error("Error updating user profile:", response.statusText);
+        console.error("Error saving user profile:", response.statusText);
       }
     } catch (error) {
-      console.error("Error updating user profile:", error);
+      console.error("Error saving user profile:", error);
     }
   };
 
@@ -139,9 +98,6 @@ function UserProfile() {
         UserID: user.UserID,
         Sec: password, // Assuming 'Sec' is your backend field for password
       };
-      const baseUrl = subdomain
-        ? `https://${subdomain}.ogfieldticket.com`
-        : "https://beta.ogpumper.net";
 
       const response = await axios.patch(
         `${baseUrl}/api/userdetails.php`,

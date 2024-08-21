@@ -12,6 +12,7 @@ import {
   faPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
+import { baseUrl } from "./config"; // Importing baseUrl from config
 
 const Leases = () => {
   const { theme } = "light";
@@ -47,17 +48,6 @@ const Leases = () => {
 
   const fetchLeases = async () => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      let baseUrl;
-
-      if (parts.length > 2) {
-        const subdomainPart = parts.shift();
-        baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-      } else {
-        baseUrl = "https://beta.ogpumper.net";
-      }
-
       const response = await axios.get(`${baseUrl}/api/leases.php`);
       const data = response.data;
       setLeases(data);
@@ -66,7 +56,6 @@ const Leases = () => {
       console.error("Error fetching leases:", error);
     }
   };
-
   const handleSearch = (e) => {
     const searchTerm = e.target.value.toLowerCase();
     setSearchTerm(searchTerm);
@@ -160,17 +149,6 @@ const Leases = () => {
         Tanks: [...formDataTanks, ...filteredTanks],
         Wells: [...formDataWells, ...filteredWells],
       };
-
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      let baseUrl;
-
-      if (parts.length > 2) {
-        const subdomainPart = parts.shift();
-        baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-      } else {
-        baseUrl = "https://beta.ogpumper.net";
-      }
 
       const response = await axios.patch(
         `${baseUrl}/api/leases.php`,
@@ -410,17 +388,6 @@ const EditLeaseModal = ({
 
   const handleDeleteWell = async (wellId) => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      let baseUrl;
-
-      if (parts.length > 2) {
-        const subdomainPart = parts.shift();
-        baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-      } else {
-        baseUrl = "https://beta.ogpumper.net";
-      }
-
       const response = await axios.delete(`${baseUrl}/api/leases.php`, {
         data: { LeaseID: lease.LeaseID, Wells: [{ UniqID: wellId }] },
       });
@@ -438,20 +405,8 @@ const EditLeaseModal = ({
       setToast({ visible: true, message: "Well is currently being used" });
     }
   };
-
   const fetchOptions = async () => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      let baseUrl;
-
-      if (parts.length > 2) {
-        const subdomainPart = parts.shift();
-        baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-      } else {
-        baseUrl = "https://beta.ogpumper.net";
-      }
-
       const response = await axios.get(`${baseUrl}/api/usertags.php`);
       const data = response.data;
       const tags = data.filter((item) => item.TagID && item.TagDesc);
@@ -465,7 +420,6 @@ const EditLeaseModal = ({
       console.error("Error fetching options:", error);
     }
   };
-
   const handleAddTank = () => {
     setFormData({
       ...formData,
@@ -492,17 +446,6 @@ const EditLeaseModal = ({
 
   const handleDeleteTank = async (tankId) => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      let baseUrl;
-
-      if (parts.length > 2) {
-        const subdomainPart = parts.shift();
-        baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-      } else {
-        baseUrl = "https://beta.ogpumper.net";
-      }
-
       const response = await axios.delete(`${baseUrl}/api/leases.php`, {
         data: { LeaseID: lease.LeaseID, Tanks: [{ UniqID: tankId }] },
       });
@@ -520,7 +463,6 @@ const EditLeaseModal = ({
       setToast({ visible: true, message: "Tank is currently being used" });
     }
   };
-
   const handleAddWell = () => {
     setFormData({
       ...formData,

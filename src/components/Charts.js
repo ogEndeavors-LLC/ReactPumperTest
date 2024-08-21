@@ -25,6 +25,7 @@ import {
   faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
 import moment from "moment";
+import { baseUrl } from "./config"; // Import the baseUrl
 
 // Helper function to filter out zero or negative values
 const filterLogarithmicData = (data) => {
@@ -113,13 +114,6 @@ const ChartComponent = () => {
 
   const fetchPreferences = useCallback(async () => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      const baseUrl =
-        parts.length > 2
-          ? `https://${parts.shift()}.ogfieldticket.com`
-          : "https://beta.ogpumper.net";
-
       const response = await fetch(
         `${baseUrl}/api/userdetails.php?id=${userID}&chartsPref=true`
       );
@@ -144,13 +138,6 @@ const ChartComponent = () => {
 
   const fetchLeases = useCallback(async () => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      const baseUrl =
-        parts.length > 2
-          ? `https://${parts.shift()}.ogfieldticket.com`
-          : "https://beta.ogpumper.net";
-
       const response = await fetch(`${baseUrl}/api/leases.php`);
       if (!response.ok) throw new Error("Network response was not ok");
       const leaseData = await response.json();
@@ -179,13 +166,6 @@ const ChartComponent = () => {
 
   const fetchChartData = useCallback(async () => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      const baseUrl =
-        parts.length > 2
-          ? `https://${parts.shift()}.ogfieldticket.com`
-          : "https://beta.ogpumper.net";
-
       const rpt = selectedLeaseID === "~ALL~" ? "C" : "P";
       const response = await fetch(
         `${baseUrl}/service_testprod.php?Rpt=${reportType}&QD=${quickLink}&LeaseID=${encodeURIComponent(
@@ -214,16 +194,6 @@ const ChartComponent = () => {
 
   const fetchWellTestData = useCallback(async () => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      let baseUrl;
-
-      if (parts.length > 2 && parts[1] === "ogpumper") {
-        baseUrl = `https://${parts[0]}.ogfieldticket.com`;
-      } else {
-        baseUrl = "https://beta.ogpumper.net"; // Fallback base URL
-      }
-
       const response = await fetch(
         `${baseUrl}/service_welltests.php?LeaseID=${selectedLeaseID}&WellID=${selectedWellID}&FromDate=${fromDate}&ThruDate=${thruDate}`
       );
@@ -285,19 +255,11 @@ const ChartComponent = () => {
   const debouncedSavePreferences = useCallback(
     debounce(async () => {
       try {
-        const hostname = window.location.hostname;
-        const parts = hostname.split(".");
-        const baseUrl =
-          parts.length > 2
-            ? `https://${parts.shift()}.ogfieldticket.com`
-            : "https://beta.ogpumper.net";
-
         const response = await fetch(`${baseUrl}/api/userdetails.php`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             UserID: userID,
-
             ChartsPref: { chartTypes, colors, logarithmic, disabledSeries },
           }),
         });

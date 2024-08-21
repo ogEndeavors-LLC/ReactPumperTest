@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { FiBarChart, FiFileText, FiDroplet } from "react-icons/fi";
 import { useTheme } from "./ThemeContext";
+import { baseUrl } from "./config"; // Import baseUrl from config
 
 const GaugeEntry = () => {
   const { theme } = useTheme();
@@ -10,13 +11,6 @@ const GaugeEntry = () => {
 
   const fetchLeases = useCallback(async () => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      const baseUrl =
-        parts.length > 2
-          ? `https://${parts.shift()}.ogpumper.net`
-          : "https://beta.ogpumper.net";
-
       const response = await fetch(`${baseUrl}/api/leases.php`);
       if (!response.ok) throw new Error("Network response was not ok");
       const leaseData = await response.json();
@@ -56,16 +50,8 @@ const GaugeEntry = () => {
       <div
         className={`${
           theme === "dark" ? "bg-gray-700 text-white" : "bg-white text-gray-800"
-        } shadow-2xl rounded-3xl p-10 sm:p-12 max-w-6xl w-full`}
+        } shadow-2xl rounded-3xl p-10 sm:p-12 max-w-4xl w-full`}
       >
-        <h1
-          className={`text-4xl sm:text-6xl font-bold mb-12 text-center ${
-            theme === "dark" ? "text-white" : "text-gray-800"
-          }`}
-        >
-          Gauge Entry
-        </h1>
-
         <div className="grid grid-cols-1 gap-8">
           <div className="mb-4">
             <label className="block mb-2 text-lg font-medium">
@@ -84,9 +70,7 @@ const GaugeEntry = () => {
           </div>
 
           <div className="mb-4">
-            <label className="block mb-2 text-lg font-medium">
-              Select Leases:
-            </label>
+            <label className="block mb-2 text-lg font-medium">Lease:</label>
             <select
               className={`block w-full ${
                 theme === "dark"
@@ -104,49 +88,29 @@ const GaugeEntry = () => {
           </div>
 
           <div className="mb-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <button
-                className={`py-3 px-4 rounded-lg shadow-lg text-lg font-bold focus:outline-none transition duration-300 ease-in-out ${
-                  selectedOption === "Daily Gauges"
-                    ? "bg-blue-600 text-white"
-                    : theme === "dark"
-                    ? "bg-gray-600 text-white"
-                    : "bg-gray-200 text-gray-700"
-                }`}
-                onClick={() => setSelectedOption("Daily Gauges")}
-              >
+            <label className="block mb-2 text-lg font-medium">Action:</label>
+            <select
+              className={`block w-full ${
+                theme === "dark"
+                  ? "bg-gray-800 text-white border-gray-600"
+                  : "bg-gray-100 text-gray-900 border-gray-300"
+              } border rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out`}
+              value={selectedOption}
+              onChange={(e) => setSelectedOption(e.target.value)}
+            >
+              <option value="Daily Gauges">
                 <FiBarChart className="inline-block mr-2" />
                 Daily Gauges
-              </button>
-
-              <button
-                className={`py-3 px-4 rounded-lg shadow-lg text-lg font-bold focus:outline-none transition duration-300 ease-in-out ${
-                  selectedOption === "Add Run Ticket"
-                    ? "bg-green-600 text-white"
-                    : theme === "dark"
-                    ? "bg-gray-600 text-white"
-                    : "bg-gray-200 text-gray-700"
-                }`}
-                onClick={() => setSelectedOption("Add Run Ticket")}
-              >
+              </option>
+              <option value="Add Run Ticket">
                 <FiFileText className="inline-block mr-2" />
                 Run Ticket
-              </button>
-
-              <button
-                className={`py-3 px-4 rounded-lg shadow-lg text-lg font-bold focus:outline-none transition duration-300 ease-in-out ${
-                  selectedOption === "Add Water Tank Ticket"
-                    ? "bg-purple-600 text-white"
-                    : theme === "dark"
-                    ? "bg-gray-600 text-white"
-                    : "bg-gray-200 text-gray-700"
-                }`}
-                onClick={() => setSelectedOption("Add Water Tank Ticket")}
-              >
+              </option>
+              <option value="Add Water Tank Ticket">
                 <FiDroplet className="inline-block mr-2" />
                 Water Tank
-              </button>
-            </div>
+              </option>
+            </select>
           </div>
 
           <div className="mb-8">

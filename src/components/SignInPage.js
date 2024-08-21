@@ -12,6 +12,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import logo from "../assets/logo.jpg";
 import { useUser } from "./UserContext";
+import { baseUrl } from "./config"; // Importing the baseUrl from config.js
 
 function SignInPage() {
   const navigate = useNavigate();
@@ -55,17 +56,6 @@ function SignInPage() {
     }
 
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      let baseUrl;
-
-      if (parts.length > 2) {
-        const subdomainPart = parts.shift();
-        baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-      } else {
-        baseUrl = "https://beta.ogpumper.net";
-      }
-
       const response = await fetch(`${baseUrl}/api/passwordreset.php`, {
         method: "POST",
         headers: {
@@ -86,19 +76,9 @@ function SignInPage() {
       setSuccessMessage(""); // Clear any previous success message
     }
   };
+
   const handleCreateNewUser = async () => {
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      let baseUrl;
-
-      if (parts.length > 2) {
-        const subdomainPart = parts.shift();
-        baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-      } else {
-        baseUrl = "https://beta.ogpumper.net";
-      }
-
       const response = await fetch(`${baseUrl}/api/google_login.php`, {
         method: "PATCH",
         headers: {
@@ -125,7 +105,6 @@ function SignInPage() {
   };
 
   function hashPassword(password) {
-    // Simplified hash function; replace with a stronger algorithm in production
     let hash = 0,
       i,
       chr;
@@ -140,17 +119,6 @@ function SignInPage() {
   async function handleSignIn(e) {
     e.preventDefault();
     try {
-      const hostname = window.location.hostname;
-      const parts = hostname.split(".");
-      let baseUrl;
-
-      if (parts.length > 2) {
-        const subdomainPart = parts.shift();
-        baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-      } else {
-        baseUrl = "https://beta.ogpumper.net";
-      }
-
       if (!navigator.onLine) {
         handleOfflineSignIn(e);
       } else {
@@ -179,7 +147,6 @@ function SignInPage() {
             })
           );
 
-          // New navigation logic based on user role
           if (user.Role === "P") {
             navigate("/pumper");
           } else {
@@ -193,6 +160,7 @@ function SignInPage() {
       setError("An error occurred while signing in.");
     }
   }
+
   function handleOfflineSignIn() {
     const storedCredentials = JSON.parse(localStorage.getItem("credentials"));
     if (storedCredentials) {
@@ -223,16 +191,6 @@ function SignInPage() {
 
   const handleGoogleLoginSuccess = (response) => {
     const token = response.credential;
-    const hostname = window.location.hostname;
-    const parts = hostname.split(".");
-    let baseUrl;
-
-    if (parts.length > 2) {
-      const subdomainPart = parts.shift();
-      baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-    } else {
-      baseUrl = "https://beta.ogpumper.net";
-    }
 
     fetch(`${baseUrl}/api/google_login.php`, {
       method: "POST",
@@ -262,17 +220,6 @@ function SignInPage() {
   };
 
   const handleExistingUserSubmit = () => {
-    const hostname = window.location.hostname;
-    const parts = hostname.split(".");
-    let baseUrl;
-
-    if (parts.length > 2) {
-      const subdomainPart = parts.shift();
-      baseUrl = `https://${subdomainPart}.ogfieldticket.com`;
-    } else {
-      baseUrl = "https://beta.ogpumper.net";
-    }
-
     fetch(`${baseUrl}/api/google_login.php`, {
       method: "POST",
       headers: {
