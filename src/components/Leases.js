@@ -13,9 +13,9 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
 import { baseUrl } from "./config"; // Importing baseUrl from config
-
+import { useTheme } from "./ThemeContext";
 const Leases = () => {
-  const { theme } = "light";
+  const { theme } = useTheme();
   const [leases, setLeases] = useState([]);
   const [filteredLeases, setFilteredLeases] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -174,7 +174,7 @@ const Leases = () => {
   return (
     <div
       className={`container mx-auto mt-5 p-4 rounded shadow ${
-        theme === "dark" ? "bg-gray-800" : "bg-white"
+        theme === "dark" ? "bg-gray-800 text-white" : "bg-white text-gray-800"
       }`}
     >
       <h1 className="text-4xl font-bold mb-8">Leases</h1>
@@ -186,8 +186,8 @@ const Leases = () => {
           onChange={handleSearch}
           className={`flex-grow px-4 py-2 rounded ${
             theme === "dark"
-              ? "bg-gray-700 text-white"
-              : "bg-gray-200 text-gray-800"
+              ? "bg-gray-700 text-white placeholder-gray-400"
+              : "bg-gray-200 text-gray-800 placeholder-gray-500"
           }`}
         />
         <button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
@@ -195,33 +195,49 @@ const Leases = () => {
         </button>
         <div className="relative">
           <button
-            className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
+            className={`px-4 py-2 rounded ${
+              theme === "dark"
+                ? "bg-gray-700 text-white hover:bg-gray-600"
+                : "bg-gray-300 text-gray-800 hover:bg-gray-400"
+            }`}
             onClick={toggleMenu}
           >
             <FontAwesomeIcon icon={faSort} /> Sort
           </button>
           {isMenuOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded z-50">
+            <div
+              className={`absolute right-0 mt-2 w-48 rounded z-50 ${
+                theme === "dark"
+                  ? "bg-gray-800 text-white"
+                  : "bg-white text-gray-800"
+              } shadow-lg`}
+            >
               <ul>
                 <li
-                  className={`px-4 py-2 hover:bg-gray-100 cursor-pointer ${
+                  className={`px-4 py-2 cursor-pointer hover:bg-opacity-90 ${
                     sortKey === "LeaseName" ? "font-bold" : ""
+                  } ${
+                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
                   }`}
                   onClick={() => handleSortClick("LeaseName")}
                 >
                   Lease Name
                 </li>
                 <li
-                  className={`px-4 py-2 hover:bg-gray-100 cursor-pointer ${
+                  className={`px-4 py-2 cursor-pointer hover:bg-opacity-90 ${
                     sortKey === "LeaseID" ? "font-bold" : ""
+                  } ${
+                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
                   }`}
                   onClick={() => handleSortClick("LeaseID")}
                 >
                   Lease ID
                 </li>
                 <li
-                  className={`px-4 py-2 hover:bg-gray-100 cursor-pointer ${
+                  className={`px-4 py-2 cursor-pointer hover:bg-opacity-90 ${
                     sortKey === "PumperID" ? "font-bold" : ""
+                  } ${
+                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
                   }`}
                   onClick={() => handleSortClick("PumperID")}
                 >
@@ -239,7 +255,9 @@ const Leases = () => {
             key={lease.LeaseID}
             style={leaseAnimation}
             className={`p-6 rounded-lg shadow-md relative ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+              theme === "dark"
+                ? "bg-gray-700 text-white"
+                : "bg-gray-100 text-gray-800"
             }`}
           >
             <div className="absolute top-2 right-2">

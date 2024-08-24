@@ -25,9 +25,9 @@ import {
   faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
 import moment from "moment";
-import { baseUrl } from "./config"; // Import the baseUrl
+import { baseUrl } from "./config";
+import { useTheme } from "./ThemeContext";
 
-// Helper function to filter out zero or negative values
 const filterLogarithmicData = (data) => {
   return data.map((item) => ({
     ...item,
@@ -41,6 +41,7 @@ const filterLogarithmicData = (data) => {
 };
 
 const ChartComponent = () => {
+  const { theme } = useTheme(); // Access theme from context
   const [reportType, setReportType] = useState("CD");
   const { user } = useUser();
   const { userRole, userID } = useUser();
@@ -68,20 +69,20 @@ const ChartComponent = () => {
     SND: "line",
   });
   const [colors, setColors] = useState({
-    Oil: "#FF7F0E",
-    ProducedWater: "#2CA02C",
-    InjectedWater: "#1F77B4",
-    Tbg: "#D62728",
-    Csg: "#9467BD",
-    Gas: "#8C564B",
-    TestOil: "#FF7F0E",
-    TestWater: "#2CA02C",
-    TestGas: "#8C564B",
-    JTF: "#FFBB78",
-    FTF: "#98DF8A",
-    FAP: "#AEC7E8",
-    GFFAP: "#FF9896",
-    SND: "#C5B0D5",
+    Oil: theme.colors.oil || "#FF7F0E",
+    ProducedWater: theme.colors.producedWater || "#2CA02C",
+    InjectedWater: theme.colors.injectedWater || "#1F77B4",
+    Tbg: theme.colors.tbg || "#D62728",
+    Csg: theme.colors.csg || "#9467BD",
+    Gas: theme.colors.gas || "#8C564B",
+    TestOil: theme.colors.testOil || "#FF7F0E",
+    TestWater: theme.colors.testWater || "#2CA02C",
+    TestGas: theme.colors.testGas || "#8C564B",
+    JTF: theme.colors.jtf || "#FFBB78",
+    FTF: theme.colors.ftf || "#98DF8A",
+    FAP: theme.colors.fap || "#AEC7E8",
+    GFFAP: theme.colors.gffap || "#FF9896",
+    SND: theme.colors.snd || "#C5B0D5",
   });
   const [colorPicker, setColorPicker] = useState({
     visible: false,
@@ -447,7 +448,6 @@ const ChartComponent = () => {
       leases.find((lease) => lease.LeaseID === selectedLeaseID)?.LeaseName ||
       "All Leases";
 
-    // Function to format date to m/d/yy
     const formatDate = (dateString) => {
       const date = new Date(dateString);
       return `${date.getMonth() + 1}/${date.getDate()}/${date
@@ -546,6 +546,7 @@ const ChartComponent = () => {
     document.body.innerHTML = originalContents;
     window.location.reload();
   };
+
   const handleEditClick = () => {
     setIsSidePanelOpen(!isSidePanelOpen);
     setIsEditing(!isEditing);
@@ -567,6 +568,10 @@ const ChartComponent = () => {
                 <select
                   value={quickLink}
                   onChange={(e) => handleQuickLinkChange(e.target.value)}
+                  style={{
+                    backgroundColor: theme.selectBgColor,
+                    color: theme.textColor,
+                  }}
                 >
                   <option value="30">Last 30 days</option>
                   <option value="CM">Current Month</option>
@@ -585,6 +590,10 @@ const ChartComponent = () => {
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
+                  style={{
+                    backgroundColor: theme.inputBgColor,
+                    color: theme.textColor,
+                  }}
                 />
               </div>
               <div className="filter-item">
@@ -593,6 +602,10 @@ const ChartComponent = () => {
                   type="date"
                   value={thruDate}
                   onChange={(e) => setThruDate(e.target.value)}
+                  style={{
+                    backgroundColor: theme.inputBgColor,
+                    color: theme.textColor,
+                  }}
                 />
               </div>
 
@@ -601,6 +614,10 @@ const ChartComponent = () => {
                 <select
                   value={selectedLeaseID}
                   onChange={(e) => setSelectedLeaseID(e.target.value)}
+                  style={{
+                    backgroundColor: theme.selectBgColor,
+                    color: theme.textColor,
+                  }}
                 >
                   {chartView === "production" ? (
                     <option value="~ALL~">All Leases</option>
@@ -636,6 +653,10 @@ const ChartComponent = () => {
                   <select
                     value={selectedTag}
                     onChange={(e) => setSelectedTag(e.target.value)}
+                    style={{
+                      backgroundColor: theme.selectBgColor,
+                      color: theme.textColor,
+                    }}
                   >
                     {tags.map((tag) => (
                       <option key={tag} value={tag}>
@@ -651,6 +672,10 @@ const ChartComponent = () => {
                     value={selectedWellID}
                     onChange={(e) => setSelectedWellID(e.target.value)}
                     disabled={selectedLeaseID === "~ALL~"}
+                    style={{
+                      backgroundColor: theme.selectBgColor,
+                      color: theme.textColor,
+                    }}
                   >
                     <option value="">Select a well</option>
                     {wells.map((well) => (
@@ -670,6 +695,10 @@ const ChartComponent = () => {
                   <select
                     value={reportType}
                     onChange={(e) => setReportType(e.target.value)}
+                    style={{
+                      backgroundColor: theme.selectBgColor,
+                      color: theme.textColor,
+                    }}
                   >
                     <option value="CD">Daily</option>
                     <option value="CM">Monthly</option>
@@ -682,12 +711,20 @@ const ChartComponent = () => {
             <button
               className="action-button print-button"
               onClick={handlePrint}
+              style={{
+                backgroundColor: theme.buttonBgColor,
+                color: theme.buttonTextColor,
+              }}
             >
               <FontAwesomeIcon icon={faPrint} className="icon" /> Print
             </button>
             <button
               className="action-button settings-button"
               onClick={handleEditClick}
+              style={{
+                backgroundColor: theme.buttonBgColor,
+                color: theme.buttonTextColor,
+              }}
             >
               <FontAwesomeIcon
                 icon={isSidePanelOpen ? faTimes : faCog}
@@ -697,7 +734,11 @@ const ChartComponent = () => {
             </button>
           </div>
         </div>
-        <div ref={chartRef} className="chart-container-inner">
+        <div
+          ref={chartRef}
+          className="chart-container-inner"
+          style={{ backgroundColor: theme.chartBgColor }}
+        >
           {isLoading ? (
             <div className="loading-spinner"></div>
           ) : (
@@ -710,7 +751,12 @@ const ChartComponent = () => {
                   dataKey="GaugeDate"
                   tickFormatter={formatXAxis}
                   interval="preserveStartEnd"
-                  tick={{ fontSize: 12, angle: -45, textAnchor: "end" }}
+                  tick={{
+                    fontSize: 12,
+                    angle: -45,
+                    textAnchor: "end",
+                    fill: theme.axisTextColor,
+                  }}
                   height={60}
                   padding={{ left: 20, right: 20 }}
                 />
@@ -721,7 +767,12 @@ const ChartComponent = () => {
                     logarithmic ? [1, "auto"] : [0, (dataMax) => dataMax * 1.1]
                   }
                   allowDataOverflow={true}
-                  label={{ value: "BBLS", angle: -90, position: "insideLeft" }}
+                  label={{
+                    value: "BBLS",
+                    angle: -90,
+                    position: "insideLeft",
+                    fill: theme.axisLabelColor,
+                  }}
                   tickCount={logarithmic ? undefined : 7}
                   tickFormatter={(value) => {
                     if (logarithmic) {
@@ -737,6 +788,7 @@ const ChartComponent = () => {
                       ? `${(value / 1000).toFixed(1)}K`
                       : value.toFixed(1);
                   }}
+                  tick={{ fill: theme.axisTextColor }}
                 />
                 <YAxis
                   yAxisId="right"
@@ -746,7 +798,12 @@ const ChartComponent = () => {
                     logarithmic ? [1, "auto"] : [0, (dataMax) => dataMax * 1.1]
                   }
                   allowDataOverflow={true}
-                  label={{ value: "MCF", angle: -90, position: "insideRight" }}
+                  label={{
+                    value: "MCF",
+                    angle: -90,
+                    position: "insideRight",
+                    fill: theme.axisLabelColor,
+                  }}
                   tickCount={logarithmic ? undefined : 7}
                   tickFormatter={(value) => {
                     if (logarithmic) {
@@ -762,11 +819,18 @@ const ChartComponent = () => {
                       ? `${(value / 1000).toFixed(1)}K`
                       : value.toFixed(1);
                   }}
+                  tick={{ fill: theme.axisTextColor }}
                 />
-                <Tooltip />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: theme.tooltipBgColor,
+                    color: theme.tooltipTextColor,
+                  }}
+                />
                 <Legend
                   onClick={handleLegendClick}
                   formatter={renderLegendText}
+                  wrapperStyle={{ color: theme.legendTextColor }}
                 />
                 {chartView === "production" ? (
                   <>
@@ -1027,14 +1091,24 @@ const ChartComponent = () => {
               </ComposedChart>
             </ResponsiveContainer>
           )}
-          <button className="reset-legend-button" onClick={resetLegend}>
+          <button
+            className="reset-legend-button"
+            onClick={resetLegend}
+            style={{
+              backgroundColor: theme.buttonBgColor,
+              color: theme.buttonTextColor,
+            }}
+          >
             <FontAwesomeIcon icon={faRedo} className="icon" /> Reset Legend
           </button>
         </div>
-        <div className={`settings-panel ${isSidePanelOpen ? "open" : ""}`}>
-          <h2>Settings</h2>
+        <div
+          className={`settings-panel ${isSidePanelOpen ? "open" : ""}`}
+          style={{ backgroundColor: theme.panelBgColor }}
+        >
+          <h2 style={{ color: theme.textColor }}>Settings</h2>
           <div className="settings-section">
-            <h3>Chart Type and Color</h3>
+            <h3 style={{ color: theme.textColor }}>Chart Type and Color</h3>
             {Object.entries(
               chartView === "production"
                 ? {
@@ -1059,11 +1133,15 @@ const ChartComponent = () => {
                   }
             ).map(([field, type]) => (
               <div key={field} className="settings-item">
-                <span>{field}</span>
+                <span style={{ color: theme.textColor }}>{field}</span>
                 <div className="chart-controls">
                   <button
                     className="chart-type-button"
                     onClick={() => handleToggle(field)}
+                    style={{
+                      backgroundColor: theme.buttonBgColor,
+                      color: theme.buttonTextColor,
+                    }}
                   >
                     {type === "line" ? (
                       <FontAwesomeIcon icon={faChartBar} />
@@ -1081,8 +1159,11 @@ const ChartComponent = () => {
             ))}
           </div>
           <div className="settings-section">
-            <h3>Y-Axis Scale</h3>
-            <label className="checkbox-label">
+            <h3 style={{ color: theme.textColor }}>Y-Axis Scale</h3>
+            <label
+              className="checkbox-label"
+              style={{ color: theme.textColor }}
+            >
               <input
                 type="checkbox"
                 checked={logarithmic}
@@ -1093,8 +1174,11 @@ const ChartComponent = () => {
           </div>
           {chartView === "production" && (
             <div className="settings-section">
-              <h3>Stacked Options</h3>
-              <label className="checkbox-label">
+              <h3 style={{ color: theme.textColor }}>Stacked Options</h3>
+              <label
+                className="checkbox-label"
+                style={{ color: theme.textColor }}
+              >
                 <input
                   type="checkbox"
                   checked={stacked}
@@ -1115,6 +1199,10 @@ const ChartComponent = () => {
               <button
                 className="close-button"
                 onClick={() => setColorPicker({ visible: false, field: null })}
+                style={{
+                  backgroundColor: theme.buttonBgColor,
+                  color: theme.buttonTextColor,
+                }}
               >
                 Close
               </button>
@@ -1122,7 +1210,14 @@ const ChartComponent = () => {
           </div>
         )}
         <div className="fab-container">
-          <button className="fab" onClick={handleChartViewChange}>
+          <button
+            className="fab"
+            onClick={handleChartViewChange}
+            style={{
+              backgroundColor: theme.fabBgColor,
+              color: theme.fabTextColor,
+            }}
+          >
             <FontAwesomeIcon icon={faExchangeAlt} />
             {chartView === "production" ? "Wells" : "Prod"}
           </button>
@@ -1143,7 +1238,7 @@ const ChartComponent = () => {
         .filters-container {
           width: 100%;
           max-width: 80%;
-          background: linear-gradient(to right, #ebf4ff, #dee6ff);
+          background: ${theme.filtersBg};
           border-radius: 8px;
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
           padding: 8px;
@@ -1180,7 +1275,7 @@ const ChartComponent = () => {
           margin-bottom: 4px;
           font-size: 12px;
           font-weight: 500;
-          color: #4a4a4a;
+          color: ${theme.textColor};
         }
 
         .filter-item select,
@@ -1188,7 +1283,7 @@ const ChartComponent = () => {
           width: 100%;
           max-width: 200px;
           padding: 4px 8px;
-          border: 1px solid #d1d5db;
+          border: 1px solid ${theme.inputBorderColor};
           border-radius: 4px;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1196,8 +1291,8 @@ const ChartComponent = () => {
 
         .filter-item select:focus,
         .filter-item input:focus {
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+          border-color: ${theme.inputFocusBorderColor};
+          box-shadow: 0 0 0 2px ${theme.inputFocusShadowColor};
           outline: none;
         }
 
@@ -1218,26 +1313,6 @@ const ChartComponent = () => {
           transition: background-color 0.15s ease, box-shadow 0.15s ease;
         }
 
-        .print-button {
-          background-color: #10b981;
-          color: #fff;
-          box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
-        }
-
-        .print-button:hover {
-          background-color: #059669;
-        }
-
-        .settings-button {
-          background-color: #3b82f6;
-          color: #fff;
-          box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
-        }
-
-        .settings-button:hover {
-          background-color: #2563eb;
-        }
-
         .next-lease-button,
         .next-well-button {
           display: inline-flex;
@@ -1246,7 +1321,7 @@ const ChartComponent = () => {
           padding: 4px;
           margin-left: 10px;
           background-color: transparent;
-          color: #1d72b8;
+          color: ${theme.iconColor};
           border: none;
           cursor: pointer;
           transition: color 0.3s ease;
@@ -1254,24 +1329,19 @@ const ChartComponent = () => {
 
         .next-lease-button:hover,
         .next-well-button:hover {
-          color: #155a8a;
+          color: ${theme.iconHoverColor};
         }
 
         .next-lease-button:focus,
         .next-well-button:focus {
           outline: none;
-          box-shadow: 0 0 0 2px rgba(29, 114, 184, 0.4);
-        }
-
-        .next-lease-button .fa-icon,
-        .next-well-button .fa-icon {
-          margin-left: 0;
+          box-shadow: 0 0 0 2px ${theme.iconFocusColor};
         }
 
         .chart-container-inner {
           width: 100%;
           max-width: 100%;
-          background-color: #ffffff;
+          background-color: ${theme.chartBgColor};
           border-radius: 8px;
           padding: 32px;
           margin-bottom: 32px;
@@ -1290,8 +1360,8 @@ const ChartComponent = () => {
           display: block;
           width: 64px;
           height: 64px;
-          border: 8px solid #f3f4f6;
-          border-top: 8px solid #3b82f6;
+          border: 8px solid ${theme.spinnerBgColor};
+          border-top: 8px solid ${theme.spinnerColor};
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }
@@ -1308,8 +1378,8 @@ const ChartComponent = () => {
         .reset-legend-button {
           margin-top: 16px;
           padding: 8px 16px;
-          background-color: #3b82f6;
-          color: #fff;
+          background-color: ${theme.buttonBgColor};
+          color: ${theme.buttonTextColor};
           border-radius: 4px;
           display: flex;
           align-items: center;
@@ -1321,7 +1391,7 @@ const ChartComponent = () => {
         }
 
         .reset-legend-button:hover {
-          background-color: #2563eb;
+          background-color: ${theme.buttonHoverColor};
         }
 
         .settings-panel {
@@ -1333,7 +1403,7 @@ const ChartComponent = () => {
           overflow-y: auto;
           width: 280px;
           padding: 24px;
-          background-color: #ffffff;
+          background-color: ${theme.panelBgColor};
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
           transition: right 0.3s ease-in-out;
         }
@@ -1346,6 +1416,7 @@ const ChartComponent = () => {
           font-size: 18px;
           font-weight: 700;
           margin-bottom: 16px;
+          color: ${theme.textColor};
         }
 
         .settings-section {
@@ -1356,6 +1427,7 @@ const ChartComponent = () => {
           font-size: 16px;
           font-weight: 600;
           margin-bottom: 8px;
+          color: ${theme.textColor};
         }
 
         .settings-item {
@@ -1374,8 +1446,8 @@ const ChartComponent = () => {
         .chart-type-button {
           padding: 6px;
           border-radius: 4px;
-          background-color: #3b82f6;
-          color: #fff;
+          background-color: ${theme.buttonBgColor};
+          color: ${theme.buttonTextColor};
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1384,7 +1456,7 @@ const ChartComponent = () => {
         }
 
         .chart-type-button:hover {
-          background-color: #2563eb;
+          background-color: ${theme.buttonHoverColor};
         }
 
         .color-box {
@@ -1417,7 +1489,7 @@ const ChartComponent = () => {
         }
 
         .color-picker-container {
-          background-color: #ffffff;
+          background-color: ${theme.panelBgColor};
           padding: 24px;
           border-radius: 8px;
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -1426,8 +1498,8 @@ const ChartComponent = () => {
         .close-button {
           margin-top: 16px;
           padding: 8px 16px;
-          background-color: #ef4444;
-          color: #fff;
+          background-color: ${theme.closeButtonBgColor};
+          color: ${theme.closeButtonTextColor};
           border-radius: 4px;
           display: flex;
           align-items: center;
@@ -1439,7 +1511,7 @@ const ChartComponent = () => {
         }
 
         .close-button:hover {
-          background-color: #dc2626;
+          background-color: ${theme.closeButtonHoverColor};
         }
 
         .fab-container {
@@ -1453,8 +1525,8 @@ const ChartComponent = () => {
           width: 56px;
           height: 56px;
           border-radius: 28px;
-          background-color: #3b82f6;
-          color: white;
+          background-color: ${theme.fabBgColor};
+          color: ${theme.fabTextColor};
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1465,7 +1537,7 @@ const ChartComponent = () => {
         }
 
         .fab:hover {
-          background-color: #2563eb;
+          background-color: ${theme.fabHoverBgColor};
           box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         }
       `}</style>

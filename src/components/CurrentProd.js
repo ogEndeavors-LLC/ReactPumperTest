@@ -1,18 +1,29 @@
 import React, { useState, useEffect } from "react";
 import { AgGridReact } from "ag-grid-react";
+import ReactDOM from "react-dom";
 import Modal from "react-modal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faImage, faSearch } from "@fortawesome/free-solid-svg-icons";
+import {
+  faImage,
+  faSearch,
+  faFileExport,
+  faPrint,
+  faArrowLeft,
+  faArrowRight,
+  faCalendarAlt,
+} from "@fortawesome/free-solid-svg-icons";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
-import { Input, Select, Spin, Alert, Typography, Space } from "antd";
+import { Input, Select, Spin, Alert, Button, Space } from "antd";
 import { LoadingOutlined } from "@ant-design/icons";
 import sampleImage from "../assets/logo.jpg";
-import { baseUrl } from "./config";
+import moment from "moment";
+import { useTheme } from "./ThemeContext";
+
 const { Option } = Select;
-const { Title } = Typography;
 
 const CurrentDataGrid = () => {
+  const { theme } = useTheme();
   const [rowData, setRowData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,6 +33,10 @@ const CurrentDataGrid = () => {
   const [totalRow, setTotalRow] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState(null);
+  const [currentDate, setCurrentDate] = useState(moment().format("MM/DD/YYYY"));
+  const [showPriorDay, setShowPriorDay] = useState(true);
+
+  const isDarkMode = theme === "dark";
 
   const fetchData = async () => {
     setLoading(true);
@@ -59,7 +74,7 @@ const CurrentDataGrid = () => {
         MeterReset: "0",
         InitialGauge: "1",
         SPCC: "Yes",
-        Comments: "Sample gauge reading",
+        gaugecomments: "This is a test comment.",
         ImageCount: 3,
         imageUrl: sampleImage,
         PriorProduced: "70.00",
@@ -69,7 +84,6 @@ const CurrentDataGrid = () => {
         WaterHauledBbls: "8.00",
       };
 
-      // Ensure all numerical fields are strings to match API data format
       Object.keys(sampleEntry).forEach((key) => {
         if (typeof sampleEntry[key] === "number") {
           sampleEntry[key] = sampleEntry[key].toFixed(2);
@@ -86,12 +100,16 @@ const CurrentDataGrid = () => {
       setLoading(false);
     }
   };
+
   const ImageCellRenderer = (params) => {
     if (params.data.ImageCount > 0) {
       return (
         <FontAwesomeIcon
           icon={faImage}
-          style={{ cursor: "pointer", color: "#1890ff" }}
+          style={{
+            cursor: "pointer",
+            color: isDarkMode ? "#FFD700" : "#1890ff",
+          }}
           onClick={() => showImageModal(params.data.imageUrl)}
         />
       );
@@ -107,7 +125,7 @@ const CurrentDataGrid = () => {
     const filtered = filterData(rowData);
     setFilteredData(filtered);
     calculateTotal(filtered);
-  }, [searchText, selectedTag]);
+  }, [searchText, selectedTag, showPriorDay]);
 
   const filterData = (data) => {
     return data.filter(
@@ -196,6 +214,15 @@ const CurrentDataGrid = () => {
     setSelectedTag(value);
   };
 
+  const handleDateChange = (days) => {
+    const newDate = moment(currentDate).add(days, "days").format("MM/DD/YYYY");
+    setCurrentDate(newDate);
+  };
+
+  const toggleShowPriorDay = () => {
+    setShowPriorDay(!showPriorDay);
+  };
+
   const columnDefs = [
     {
       headerName: "Location",
@@ -204,148 +231,270 @@ const CurrentDataGrid = () => {
       filter: true,
       checkboxSelection: true,
       pinned: "left",
-      wrapText: true,
-      autoHeight: true,
       width: 150,
-      cellStyle: { fontWeight: "bold", color: "#1a237e" },
+      cellStyle: () => ({
+        fontWeight: "bold",
+        backgroundColor: isDarkMode ? "#303030" : "#e3f2fd",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+      }),
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
     },
+    ...(showPriorDay
+      ? [
+          {
+            headerName: `${moment(currentDate)
+              .subtract(1, "days")
+              .format("MM/DD")} Oil`,
+            field: "PriorProduced",
+            sortable: true,
+            filter: true,
+            width: 120,
+            cellStyle: {
+              backgroundColor: isDarkMode ? "#424242" : "#f8d7da",
+              fontWeight: "500",
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+              color: isDarkMode ? "#FFFFFF" : "#000000",
+              opacity: 0.6, // Reduced opacity for prior day
+            },
+            headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+            valueFormatter: (params) =>
+              params.value !== null
+                ? parseFloat(params.value).toFixed(2)
+                : "0.00",
+          },
+          {
+            headerName: "Prior Gas",
+            field: "PriorGas",
+            sortable: true,
+            filter: true,
+            width: 100,
+            cellStyle: {
+              backgroundColor: isDarkMode ? "#424242" : "#fff3cd",
+              fontWeight: "500",
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+              color: isDarkMode ? "#FFFFFF" : "#000000",
+              opacity: 0.6, // Reduced opacity for prior day
+            },
+            headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+            valueFormatter: (params) =>
+              params.value !== null
+                ? parseFloat(params.value).toFixed(2)
+                : "0.00",
+          },
+          {
+            headerName: "Prior Water",
+            field: "PriorWaterTotal",
+            sortable: true,
+            filter: true,
+            width: 120,
+            cellStyle: {
+              backgroundColor: isDarkMode ? "#424242" : "#d0e9ff",
+              fontWeight: "500",
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+              color: isDarkMode ? "#FFFFFF" : "#000000",
+              opacity: 0.6, // Reduced opacity for prior day
+            },
+            headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+            valueFormatter: (params) =>
+              params.value !== null
+                ? parseFloat(params.value).toFixed(2)
+                : "0.00",
+          },
+          {
+            headerName: "Prior Injected",
+            field: "PriorWaterInjectedTotal",
+            sortable: true,
+            filter: true,
+            width: 120,
+            cellStyle: {
+              backgroundColor: isDarkMode ? "#424242" : "#d6efd7",
+              fontWeight: "500",
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+              color: isDarkMode ? "#FFFFFF" : "#000000",
+              opacity: 0.6, // Reduced opacity for prior day
+            },
+            headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+            valueFormatter: (params) =>
+              params.value !== null
+                ? parseFloat(params.value).toFixed(2)
+                : "0.00",
+          },
+        ]
+      : []),
     {
-      headerName: "08/18 Oil",
+      headerName: `${currentDate} Oil`,
       field: "Produced",
       sortable: true,
       filter: true,
       valueFormatter: (params) =>
         params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       width: 120,
-      cellStyle: { color: "#d32f2f", fontWeight: "500" },
+      cellStyle: {
+        backgroundColor: isDarkMode ? "#5d4037" : "#ffebee",
+        fontWeight: "500",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+        opacity: 0.9, // Increased opacity for current day
+      },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
     },
     {
       headerName: "Gas",
       field: "Gas",
       sortable: true,
       filter: true,
+      width: 100,
       cellStyle: {
-        color: "#ffd600",
+        backgroundColor: isDarkMode ? "#424242" : "#fff8e1",
         fontWeight: "500",
-        textShadow: "0px 0px 1px #000",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+        opacity: 0.9, // Increased opacity for current day
       },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       valueFormatter: (params) =>
         params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      width: 100,
     },
     {
       headerName: "Water",
       field: "WaterTotal",
       sortable: true,
       filter: true,
-      cellStyle: { color: "#0277bd", fontWeight: "500" },
+      width: 120,
+      cellStyle: {
+        backgroundColor: isDarkMode ? "#01579b" : "#e1f5fe",
+        fontWeight: "500",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+        opacity: 0.9, // Increased opacity for current day
+      },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       valueFormatter: (params) =>
         params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      width: 120,
     },
     {
       headerName: "Injected",
       field: "WaterInjectedTotal",
       sortable: true,
       filter: true,
-      cellStyle: { color: "#1a237e", fontWeight: "500" },
-      valueFormatter: (params) =>
-        params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       width: 120,
-    },
-    {
-      headerName: "08/19 Oil",
-      field: "PriorProduced",
-      sortable: true,
-      filter: true,
-      valueFormatter: (params) =>
-        params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      width: 120,
-      cellStyle: { color: "#c62828", fontWeight: "500" },
-    },
-    {
-      headerName: "Gas",
-      field: "PriorGas",
-      sortable: true,
-      filter: true,
       cellStyle: {
-        color: "#fbc02d",
+        backgroundColor: isDarkMode ? "#00695c" : "#e8f5e9",
         fontWeight: "500",
-        textShadow: "0px 0px 1px #000",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+        opacity: 0.9, // Increased opacity for current day
       },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       valueFormatter: (params) =>
         params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      width: 100,
-    },
-    {
-      headerName: "Water",
-      field: "PriorWaterTotal",
-      sortable: true,
-      filter: true,
-      cellStyle: { color: "#0288d1", fontWeight: "500" },
-      valueFormatter: (params) =>
-        params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      width: 120,
-    },
-    {
-      headerName: "Injected",
-      field: "PriorWaterInjectedTotal",
-      sortable: true,
-      filter: true,
-      cellStyle: { color: "#283593", fontWeight: "500" },
-      valueFormatter: (params) =>
-        params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      width: 120,
     },
     {
       headerName: "Comment",
       field: "gaugecomments",
       sortable: true,
       filter: true,
-      wrapText: true,
+      minWidth: 150,
+      cellStyle: {
+        backgroundColor: isDarkMode ? "#212121" : "#f5f5f5",
+        fontStyle: "italic",
+        whiteSpace: "normal",
+        lineHeight: "20px",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+      },
       autoHeight: true,
-      width: 200,
-      cellStyle: { color: "#4a148c", fontStyle: "italic" },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
     },
     {
       headerName: "Bbls OH",
       field: "OnHand",
       sortable: true,
       filter: true,
-      cellStyle: { color: "#455a64", fontWeight: "500" },
+      width: 120,
+      cellStyle: {
+        backgroundColor: isDarkMode ? "#424242" : "#eceff1",
+        fontWeight: "500",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+      },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       valueFormatter: (params) =>
         params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      width: 120,
     },
     {
       headerName: "Run Bbls",
       field: "RunBbls",
       sortable: true,
       filter: true,
-      cellStyle: { color: "#37474f", fontWeight: "500" },
+      width: 120,
+      cellStyle: {
+        backgroundColor: isDarkMode ? "#546e7a" : "#cfd8dc",
+        fontWeight: "500",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+      },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       valueFormatter: (params) =>
         params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      width: 120,
     },
     {
       headerName: "Water Hauled",
       field: "WaterHauledBbls",
       sortable: true,
       filter: true,
-      cellStyle: { color: "#01579b", fontWeight: "500" },
+      width: 120,
+      cellStyle: {
+        backgroundColor: isDarkMode ? "#1e88e5" : "#bbdefb",
+        fontWeight: "500",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+      },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       valueFormatter: (params) =>
         params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      width: 120,
     },
     {
       headerName: "BS&W Draw",
       field: "DrawBbls",
       sortable: true,
       filter: true,
-      cellStyle: { color: "#263238", fontWeight: "500" },
+      width: 120,
+      cellStyle: {
+        backgroundColor: isDarkMode ? "#37474f" : "#b0bec5",
+        fontWeight: "500",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+      },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       valueFormatter: (params) =>
         params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      width: 120,
     },
     {
       headerName: "Images",
@@ -358,7 +507,12 @@ const CurrentDataGrid = () => {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
+        backgroundColor: isDarkMode ? "#424242" : "#f5f5f5",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
       },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
     },
     {
       headerName: "Lease ID",
@@ -366,7 +520,15 @@ const CurrentDataGrid = () => {
       sortable: true,
       filter: true,
       width: 100,
-      cellStyle: { color: "#006064", fontWeight: "500" },
+      cellStyle: {
+        backgroundColor: isDarkMode ? "#00796b" : "#e0f7fa",
+        fontWeight: "500",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+      },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
     },
     {
       headerName: "Pumper ID",
@@ -374,9 +536,72 @@ const CurrentDataGrid = () => {
       sortable: true,
       filter: true,
       width: 100,
-      cellStyle: { color: "#004d40", fontWeight: "500" },
+      cellStyle: {
+        backgroundColor: isDarkMode ? "#004d40" : "#e0f2f1",
+        fontWeight: "500",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        overflow: "hidden",
+        color: isDarkMode ? "#FFFFFF" : "#000000",
+      },
+      headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
     },
   ];
+  const handleExport = () => {
+    const csvContent = filteredData
+      .map((row) => Object.values(row).join(","))
+      .join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `export_${currentDate}.csv`;
+    link.click();
+  };
+
+  const handlePrint = () => {
+    const gridElement = document.querySelector(".ag-theme-alpine");
+    if (!gridElement) {
+      console.error("Grid element not found");
+      return;
+    }
+
+    const printContent = gridElement.innerHTML;
+    const originalContent = document.body.innerHTML;
+
+    document.body.innerHTML = `
+      <div style="padding: 20px;">
+        <h1>Current Data Report</h1>
+        <p>Date: ${currentDate}</p>
+        ${printContent}
+      </div>
+    `;
+
+    window.print();
+
+    document.body.innerHTML = originalContent;
+
+    // Re-render the component to restore event listeners
+    // You may need to modify this based on your app's structure
+    ReactDOM.render(<CurrentDataGrid />, document.getElementById("root"));
+  };
+
+  const inputStyles = {
+    backgroundColor: isDarkMode ? "#333333" : "#ffffff",
+    color: isDarkMode ? "#E0E0E0" : "#000000",
+    border: isDarkMode ? "1px solid #555" : "1px solid #ccc",
+  };
+
+  const selectStyles = {
+    width: "30%",
+    backgroundColor: isDarkMode ? "#333333" : "#ffffff",
+    color: isDarkMode ? "#E0E0E0" : "#000000",
+    border: isDarkMode ? "1px solid #555" : "1px solid #ccc",
+  };
+
+  const selectDropdownStyles = {
+    backgroundColor: isDarkMode ? "#333333" : "#ffffff",
+    color: isDarkMode ? "#E0E0E0" : "#000000",
+  };
 
   if (loading)
     return (
@@ -387,42 +612,134 @@ const CurrentDataGrid = () => {
 
   return (
     <div
-      className="ag-theme-alpine"
+      className={`ag-theme-alpine ${isDarkMode ? "dark" : ""}`}
       style={{
         padding: "20px",
-        background: "#f0f2f5",
+        background: isDarkMode ? "#1E1E1E" : "#f0f2f5",
         borderRadius: "10px",
         overflowX: "auto",
         marginBottom: "30px",
+        color: isDarkMode ? "#E0E0E0" : "#000000",
       }}
     >
-      <Title level={2} style={{ textAlign: "center", marginBottom: "20px" }}>
-        Current Data Grid
-      </Title>
-      <Space
-        direction="vertical"
-        style={{ width: "100%", marginBottom: "20px" }}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "20px",
+          gap: "10px",
+        }}
       >
+        <Space>
+          <Button
+            icon={<FontAwesomeIcon icon={faArrowLeft} />}
+            onClick={() => handleDateChange(-1)}
+            style={{
+              backgroundColor: isDarkMode ? "#333333" : "#e3f2fd",
+              color: isDarkMode ? "#E0E0E0" : "#000000",
+              border: isDarkMode ? "none" : "1px solid #ccc",
+            }}
+          />
+          <Button
+            icon={<FontAwesomeIcon icon={faCalendarAlt} />}
+            onClick={() => setCurrentDate(moment().format("MM/DD/YYYY"))}
+            style={{
+              backgroundColor: isDarkMode ? "#333333" : "#e3f2fd",
+              color: isDarkMode ? "#E0E0E0" : "#000000",
+              border: isDarkMode ? "none" : "1px solid #ccc",
+            }}
+          >
+            {currentDate}
+          </Button>
+          <Button
+            icon={<FontAwesomeIcon icon={faArrowRight} />}
+            onClick={() => handleDateChange(1)}
+            style={{
+              backgroundColor: isDarkMode ? "#333333" : "#e3f2fd",
+              color: isDarkMode ? "#E0E0E0" : "#000000",
+              border: isDarkMode ? "none" : "1px solid #ccc",
+            }}
+          />
+        </Space>
         <Input
           placeholder="Search Lease ID / Lease Name / Pumper ID"
           value={searchText}
           onChange={handleSearchChange}
           prefix={<FontAwesomeIcon icon={faSearch} />}
           size="large"
+          style={inputStyles}
         />
         <Select
           placeholder="Filter by Tag"
           onChange={handleTagChange}
-          style={{ width: "100%" }}
           size="large"
+          style={selectStyles}
+          dropdownStyle={selectDropdownStyles}
         >
-          <Option value="">All Tags</Option>
-          <Option value="Tag1">Tag1</Option>
-          <Option value="Tag2">Tag2</Option>
-          <Option value="Tag3">Tag3</Option>
-          <Option value="Tag4">Tag4</Option>
+          <Option
+            value=""
+            style={{ color: isDarkMode ? "#E0E0E0" : "#000000" }}
+          >
+            All Tags
+          </Option>
+          <Option
+            value="Tag1"
+            style={{ color: isDarkMode ? "#E0E0E0" : "#000000" }}
+          >
+            Tag1
+          </Option>
+          <Option
+            value="Tag2"
+            style={{ color: isDarkMode ? "#E0E0E0" : "#000000" }}
+          >
+            Tag2
+          </Option>
+          <Option
+            value="Tag3"
+            style={{ color: isDarkMode ? "#E0E0E0" : "#000000" }}
+          >
+            Tag3
+          </Option>
+          <Option
+            value="Tag4"
+            style={{ color: isDarkMode ? "#E0E0E0" : "#000000" }}
+          >
+            Tag4
+          </Option>
         </Select>
-      </Space>
+        <Space>
+          <Button
+            onClick={toggleShowPriorDay}
+            style={{
+              backgroundColor: isDarkMode ? "#333333" : "#e3f2fd",
+              color: isDarkMode ? "#E0E0E0" : "#000000",
+              border: isDarkMode ? "none" : "1px solid #ccc",
+            }}
+          >
+            {showPriorDay ? "Hide Prior Day" : "Show Prior Day"}
+          </Button>
+          <FontAwesomeIcon
+            icon={faFileExport}
+            style={{
+              cursor: "pointer",
+              fontSize: "24px",
+              color: isDarkMode ? "#FFD700" : "#1890ff",
+            }}
+            onClick={handleExport}
+          />
+          <FontAwesomeIcon
+            icon={faPrint}
+            style={{
+              cursor: "pointer",
+              fontSize: "24px",
+              color: isDarkMode ? "#FFD700" : "#1890ff",
+            }}
+            onClick={handlePrint}
+          />
+        </Space>
+      </div>
+
       <AgGridReact
         rowData={[totalRow, ...filteredData]}
         columnDefs={columnDefs}
@@ -434,15 +751,18 @@ const CurrentDataGrid = () => {
           resizable: true,
           flex: 1,
           minWidth: 100,
+          autoHeight: true,
+          wrapText: true,
         }}
         pagination={true}
         paginationPageSize={100}
         domLayout="autoHeight"
+        getRowHeight={() => "auto"}
         getRowStyle={(params) =>
           params.node.rowIndex === 0
             ? {
                 fontWeight: "bold",
-                backgroundColor: "#e8f5e9",
+                backgroundColor: isDarkMode ? "#2e7d32" : "#e8f5e9",
               }
             : {}
         }
@@ -450,11 +770,13 @@ const CurrentDataGrid = () => {
           imageCellRenderer: ImageCellRenderer,
         }}
         style={{
-          boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+          boxShadow: isDarkMode
+            ? "0 4px 8px rgba(0, 0, 0, 0.5)"
+            : "0 4px 8px rgba(0, 0, 0, 0.1)",
           borderRadius: "10px",
+          overflowX: "auto",
         }}
       />
-
       <Modal
         isOpen={isModalOpen}
         onRequestClose={closeModal}
@@ -467,11 +789,31 @@ const CurrentDataGrid = () => {
             bottom: "auto",
             marginRight: "-50%",
             transform: "translate(-50%, -50%)",
+            backgroundColor: isDarkMode ? "#424242" : "#ffffff",
+            color: isDarkMode ? "#FFFFFF" : "#000000",
           },
         }}
       >
-        {selectedImageUrl && <img src={selectedImageUrl} alt="Selected" />}
-        <button onClick={closeModal}>Close</button>
+        {selectedImageUrl && (
+          <img
+            src={selectedImageUrl}
+            alt="Selected"
+            style={{ maxWidth: "100%" }}
+          />
+        )}
+        <button
+          onClick={closeModal}
+          style={{
+            marginTop: "10px",
+            padding: "8px 16px",
+            backgroundColor: isDarkMode ? "#303030" : "#f0f0f0",
+            color: isDarkMode ? "#FFFFFF" : "#000000",
+            border: isDarkMode ? "none" : "1px solid #ccc",
+            cursor: "pointer",
+          }}
+        >
+          Close
+        </button>
       </Modal>
     </div>
   );

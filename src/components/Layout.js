@@ -6,8 +6,9 @@ import { useTheme } from "./ThemeContext";
 import { useUser } from "./UserContext";
 import OutsideClickHandler from "react-outside-click-handler";
 import HomeIcon from "@mui/icons-material/Home";
-import ReportIcon from "@mui/icons-material/Assessment"; // Report Icon
-import PumperIcon from "@mui/icons-material/BuildCircle"; // Pumper Icon
+import ReportIcon from "@mui/icons-material/Assessment";
+import PumperIcon from "@mui/icons-material/BuildCircle";
+import ChartIcon from "@mui/icons-material/ShowChart"; // Import the Chart Icon
 import Footer from "./Footer";
 import logo from "../assets/100.png";
 
@@ -329,6 +330,9 @@ function Layout({ children }) {
           </NavItem>
           <NavItem onClick={() => navigate("/pumper")} theme={theme}>
             <PumperIcon className="material-icon" />
+          </NavItem>
+          <NavItem onClick={() => navigate("/Charts")} theme={theme}>
+            <ChartIcon className="material-icon" />
           </NavItem>
           <NavItem onClick={toggleProfileCard} theme={theme}>
             <span className="material-symbols-outlined">account_circle</span>

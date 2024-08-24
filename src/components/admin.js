@@ -6,13 +6,11 @@ import {
   faFileContract,
   faBriefcase,
   faList,
-  faChartLine,
 } from "@fortawesome/free-solid-svg-icons";
 import Modal from "react-modal";
 import { useTheme } from "./ThemeContext";
 import Leases from "./Leases";
 import ControlUsers from "./ControlUsers";
-import Charts from "./Charts"; // Import the Charts component
 
 Modal.setAppElement("#root");
 
@@ -105,28 +103,6 @@ const Admin = () => {
                 </li>
               </ul>
             )}
-            <li
-              className={`px-6 py-4 rounded-lg flex items-center gap-3 cursor-pointer transition-colors duration-200 ${sidePanelHoverClass} ${
-                activePanel === "charts" ? activePanelClass : ""
-              }`}
-              onClick={() => handleChangePanel("charts", "chartsView")}
-            >
-              <FontAwesomeIcon icon={faChartLine} className="text-xl" />
-              <span className="text-lg font-medium">Charts</span>
-            </li>
-            {activePanel === "charts" && (
-              <ul className="pl-8 space-y-2">
-                <li
-                  className={`px-6 py-4 rounded-lg flex items-center gap-3 cursor-pointer transition-colors duration-200 ${sidePanelHoverClass} ${
-                    activeSubPanel === "chartsView" ? activePanelClass : ""
-                  }`}
-                  onClick={() => handleChangePanel("charts", "chartsView")}
-                >
-                  <FontAwesomeIcon icon={faList} className="text-lg" />
-                  <span className="text-md">Charts View</span>
-                </li>
-              </ul>
-            )}
           </ul>
         </animated.div>
       </div>
@@ -138,8 +114,6 @@ const Admin = () => {
             <Leases />
           ) : activePanel === "users" && activeSubPanel === "userList" ? (
             <ControlUsers />
-          ) : activePanel === "charts" && activeSubPanel === "chartsView" ? (
-            <Charts />
           ) : null}
         </animated.div>
       </div>

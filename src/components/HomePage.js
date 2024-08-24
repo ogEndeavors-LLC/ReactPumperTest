@@ -1,131 +1,232 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { FiBarChart, FiFileText, FiDroplet } from "react-icons/fi";
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  FaChartBar,
+  FaClipboardList,
+  FaFileAlt,
+  FaPen,
+  FaFlask,
+  FaArrowDown,
+  FaTachometerAlt,
+} from "react-icons/fa";
 import { useTheme } from "./ThemeContext";
-import { baseUrl } from "./config"; // Import baseUrl from config
 
-const GaugeEntry = () => {
+const Homepage = () => {
+  // Use the theme from context
   const { theme } = useTheme();
-  const [wells, setWells] = useState([]);
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedOption, setSelectedOption] = useState("");
+  // Initialize the navigate function for routing
+  const navigate = useNavigate();
+  // Determine if dark mode is active
+  const isDarkMode = theme === "dark";
 
-  const fetchLeases = useCallback(async () => {
-    try {
-      const response = await fetch(`${baseUrl}/api/leases.php`);
-      if (!response.ok) throw new Error("Network response was not ok");
-      const leaseData = await response.json();
-
-      const allWells = leaseData.flatMap((lease) =>
-        lease.Wells.map((well) => ({
-          ...well,
-          LeaseName: lease.LeaseName,
-        }))
-      );
-
-      const filteredWells = allWells.filter(
-        (well, index) =>
-          index === 0 || well.LeaseName !== allWells[index - 1].LeaseName
-      );
-
-      setWells(filteredWells);
-    } catch (error) {
-      console.error("Error fetching leases:", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchLeases();
-    const currentDate = new Date().toISOString().split("T")[0];
-    setSelectedDate(currentDate);
-  }, [fetchLeases]);
+  // Function to handle navigation to the Pumper page
+  const handleGaugeEntryClick = () => {
+    navigate("/pumper");
+  };
 
   return (
     <div
       className={`min-h-screen ${
-        theme === "dark"
-          ? "bg-gradient-to-br from-gray-800 to-gray-900 text-white"
-          : "bg-gradient-to-br from-indigo-50 to-blue-100 text-gray-800"
-      } flex flex-col justify-center items-center p-8`}
+        isDarkMode
+          ? "bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 text-gray-100"
+          : "bg-gradient-to-r from-gray-50 via-gray-200 to-gray-300 text-gray-800"
+      } flex flex-col justify-start items-center px-4 sm:px-6 lg:px-8`}
     >
+      {/* Main content container */}
       <div
         className={`${
-          theme === "dark" ? "bg-gray-700 text-white" : "bg-white text-gray-800"
-        } shadow-2xl rounded-3xl p-10 sm:p-12 max-w-4xl w-full`}
+          isDarkMode ? "bg-gray-800" : "bg-white"
+        } shadow-2xl rounded-3xl p-10 sm:p-12 max-w-6xl w-full mt-16`}
       >
+        {/* Dashboard title */}
+        <h1
+          className={`text-4xl sm:text-6xl font-extrabold mb-12 text-center tracking-wide ${
+            isDarkMode ? "text-gray-100" : "text-gray-800"
+          }`}
+        >
+          Admin Dashboard
+        </h1>
+
+        {/* Grid container for dashboard sections */}
         <div className="grid grid-cols-1 gap-8">
-          <div className="mb-4">
-            <label className="block mb-2 text-lg font-medium">
-              Gauge Date:
-            </label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className={`block w-full ${
-                theme === "dark"
-                  ? "bg-gray-800 text-white border-gray-600"
-                  : "bg-gray-100 text-gray-900 border-gray-300"
-              } border rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out`}
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block mb-2 text-lg font-medium">Lease:</label>
-            <select
-              className={`block w-full ${
-                theme === "dark"
-                  ? "bg-gray-800 text-white border-gray-600"
-                  : "bg-gray-100 text-gray-900 border-gray-300"
-              } border rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out`}
-              onChange={(e) => setSelectedOption(e.target.value)}
+          {/* Top Row: Current Production & Injection */}
+          <div
+            className={`${
+              isDarkMode
+                ? "bg-gradient-to-br from-blue-900 to-blue-800 border-blue-600"
+                : "bg-gradient-to-br from-blue-50 to-blue-100 border-blue-400"
+            } p-10 rounded-xl shadow-lg border-t-4`}
+          >
+            <h2
+              className={`flex items-center justify-center text-2xl font-bold text-center ${
+                isDarkMode ? "text-blue-400" : "text-blue-700"
+              }`}
             >
-              {wells.map((well, index) => (
-                <option key={index} value={well.WellName}>
-                  {well.WellName} - {well.LeaseName}
-                </option>
-              ))}
-            </select>
+              <FaTachometerAlt
+                className={`h-8 w-8 ${
+                  isDarkMode ? "text-blue-400" : "text-blue-500"
+                } mr-3`}
+              />
+              Current Production & Injection
+            </h2>
           </div>
 
-          <div className="mb-4">
-            <label className="block mb-2 text-lg font-medium">Action:</label>
-            <select
-              className={`block w-full ${
-                theme === "dark"
-                  ? "bg-gray-800 text-white border-gray-600"
-                  : "bg-gray-100 text-gray-900 border-gray-300"
-              } border rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out`}
-              value={selectedOption}
-              onChange={(e) => setSelectedOption(e.target.value)}
+          {/* Middle Section: 3 Rows */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Inventory by Lease */}
+            <div
+              className={`p-10 rounded-xl shadow-lg border-t-4 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-500"
+                  : "bg-white border-gray-200"
+              }`}
             >
-              <option value="Daily Gauges">
-                <FiBarChart className="inline-block mr-2" />
-                Daily Gauges
-              </option>
-              <option value="Add Run Ticket">
-                <FiFileText className="inline-block mr-2" />
-                Run Ticket
-              </option>
-              <option value="Add Water Tank Ticket">
-                <FiDroplet className="inline-block mr-2" />
-                Water Tank
-              </option>
-            </select>
+              <h2
+                className={`flex items-center text-2xl font-bold ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                <FaClipboardList
+                  className={`h-8 w-8 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-400"
+                  } mr-3`}
+                />
+                Inventory by Lease
+              </h2>
+            </div>
+
+            {/* Inventory by Tank */}
+            <div
+              className={`p-10 rounded-xl shadow-lg border-t-4 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-500"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <h2
+                className={`flex items-center text-2xl font-bold ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                <FaFileAlt
+                  className={`h-8 w-8 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-400"
+                  } mr-3`}
+                />
+                Inventory by Tank
+              </h2>
+            </div>
+
+            {/* Reports */}
+            <div
+              className={`p-10 rounded-xl shadow-lg border-t-4 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-500"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <h2
+                className={`flex items-center text-2xl font-bold ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                <FaChartBar
+                  className={`h-8 w-8 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-400"
+                  } mr-3`}
+                />
+                Reports
+              </h2>
+            </div>
+
+            {/* Notes */}
+            <div
+              className={`p-10 rounded-xl shadow-lg border-t-4 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-500"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <h2
+                className={`flex items-center text-2xl font-bold ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                <FaPen
+                  className={`h-8 w-8 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-400"
+                  } mr-3`}
+                />
+                Notes
+              </h2>
+            </div>
+
+            {/* Well Tests */}
+            <div
+              className={`p-10 rounded-xl shadow-lg border-t-4 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-500"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <h2
+                className={`flex items-center text-2xl font-bold ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                <FaFlask
+                  className={`h-8 w-8 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-400"
+                  } mr-3`}
+                />
+                Well Tests
+              </h2>
+            </div>
+
+            {/* Wells Down */}
+            <div
+              className={`p-10 rounded-xl shadow-lg border-t-4 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-500"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <h2
+                className={`flex items-center text-2xl font-bold ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                <FaArrowDown
+                  className={`h-8 w-8 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-400"
+                  } mr-3`}
+                />
+                Wells Down
+              </h2>
+            </div>
           </div>
 
-          <div className="mb-8">
-            <button className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-full shadow-lg text-lg transition duration-300 ease-in-out">
-              GO
-            </button>
-          </div>
-
-          <div className="flex flex-col sm:flex-row justify-between space-y-4 sm:space-y-0 sm:space-x-4">
-            <button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-full shadow-lg text-lg transition duration-300 ease-in-out">
-              View Inventory
-            </button>
-            <button className="w-full sm:w-auto bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded-full shadow-lg text-lg transition duration-300 ease-in-out">
-              View Production
-            </button>
+          {/* Bottom Row: Gauge Entry (Clickable) */}
+          <div
+            className={`${
+              isDarkMode
+                ? "bg-gradient-to-br from-indigo-900 to-indigo-800 border-indigo-600"
+                : "bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-400"
+            } p-10 rounded-xl shadow-lg border-t-4 cursor-pointer transition-all duration-300 hover:shadow-2xl`}
+            onClick={handleGaugeEntryClick}
+          >
+            <h2
+              className={`flex items-center justify-center text-2xl font-bold text-center ${
+                isDarkMode ? "text-indigo-400" : "text-indigo-700"
+              }`}
+            >
+              <FaChartBar
+                className={`h-8 w-8 ${
+                  isDarkMode ? "text-indigo-400" : "text-indigo-500"
+                } mr-3`}
+              />
+              Gauge Entry
+            </h2>
           </div>
         </div>
       </div>
@@ -133,4 +234,4 @@ const GaugeEntry = () => {
   );
 };
 
-export default GaugeEntry;
+export default Homepage;
