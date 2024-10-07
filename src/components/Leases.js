@@ -875,6 +875,26 @@ const EditLeaseModal = ({
                         className="mt-1 form-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-blue-300 transition duration-150"
                       />
                     </div>
+                    <div>
+                      <label
+                        htmlFor="Target"
+                        className="block text-sm font-medium text-gray-700"
+                      >
+                        Target
+                      </label>
+                      <input
+                        type="text"
+                        name="Target"
+                        value={formData.Target || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            Target: e.target.value,
+                          })
+                        }
+                        className="mt-1 form-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-blue-300 transition duration-150"
+                      />
+                    </div>
                   </>
                 )}
 

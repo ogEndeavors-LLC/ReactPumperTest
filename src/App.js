@@ -16,6 +16,9 @@ import { UserProvider } from "./components/UserContext";
 import Admin from "./components/admin";
 import CurrentProd from "./components/CurrentProd";
 import Chart from "./components/Charts";
+import Inv from "./components/LeaseInventory";
+import ProductionSummary from "./components/ProductionSummary";
+import Reports from "./components/Reports";
 function TitleUpdater() {
   const location = useLocation();
 
@@ -24,12 +27,23 @@ function TitleUpdater() {
       "/": "Sign In",
       "/pumper": "Gauge Entry",
       "/prod": "Current Production",
+      "/prodSummary": "Production Summary",
+      "/inv": "Lease Inventory",
       "/home": "Home",
       "/profile-details": "Profile Details",
       "/admin-panel": "Admin Panel",
+      "/Charts": "Charts",
+      "/reports": "Reports",
     };
 
-    document.title = titleMap[location.pathname] || "My App";
+    // Extract the base path without query parameters
+    const basePath = location.pathname.split("/").slice(0, 2).join("/");
+
+    // Find the matching title or use default
+    const pageTitle =
+      titleMap[basePath] || titleMap[location.pathname] || "My App";
+
+    document.title = pageTitle;
   }, [location]);
 
   return null;
@@ -37,8 +51,8 @@ function TitleUpdater() {
 
 function App() {
   return (
-    <UserProvider>
-      <ThemeProvider>
+    <ThemeProvider>
+      <UserProvider>
         <TitleUpdater />
         <Routes>
           <Route path="/" element={<SignInPage />} />
@@ -55,6 +69,31 @@ function App() {
             element={
               <Layout>
                 <CurrentProd />
+              </Layout>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <Layout>
+                <Reports />
+              </Layout>
+            }
+          />
+
+          <Route
+            path="/prodSummary"
+            element={
+              <Layout>
+                <ProductionSummary />
+              </Layout>
+            }
+          />
+          <Route
+            path="/inv"
+            element={
+              <Layout>
+                <Inv />
               </Layout>
             }
           />
@@ -91,8 +130,8 @@ function App() {
             }
           />
         </Routes>
-      </ThemeProvider>
-    </UserProvider>
+      </UserProvider>
+    </ThemeProvider>
   );
 }
 

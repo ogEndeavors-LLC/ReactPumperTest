@@ -20,6 +20,96 @@ const GlobalStyle = createGlobalStyle`
       theme === "dark" ? "#121212" : "#FFFFFF"};
   }
 `;
+const DropdownContainer = styled.div`
+  position: relative;
+  display: inline-block;
+`;
+const DetailsButton = styled.button`
+  padding: 10px 20px;
+  border: none;
+  border-radius: 50px;
+  background-color: ${({ theme }) =>
+    theme === "dark" ? "#4E9F3D" : "#76C893"};
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+
+  &:hover {
+    background-color: ${({ theme }) =>
+      theme === "dark" ? "#3d7a2e" : "#5da671"};
+    transform: translateY(-2px);
+  }
+`;
+
+const DropdownSummary = styled.summary`
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+  user-select: none;
+
+  &:hover {
+    background-color: ${({ theme }) =>
+      theme === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.05)"};
+  }
+
+  &::after {
+    content: "▼";
+    font-size: 0.7em;
+    margin-left: 0.5em;
+  }
+`;
+
+const DropdownContent = styled.div`
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: ${({ theme }) =>
+    theme === "dark" ? "#2d3748" : "#ffffff"};
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  opacity: ${({ isOpen }) => (isOpen ? "1" : "0")};
+  transform: ${({ isOpen }) =>
+    isOpen ? "translateY(0)" : "translateY(-10px)"};
+  pointer-events: ${({ isOpen }) => (isOpen ? "all" : "none")};
+`;
+
+const NavDropdown = ({ children, theme }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <DropdownContainer
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <DropdownSummary theme={theme}>{children[0]}</DropdownSummary>
+      <DropdownContent theme={theme} isOpen={isOpen}>
+        {children.slice(1)}
+      </DropdownContent>
+    </DropdownContainer>
+  );
+};
+
+const NavDropdownItem = styled.div`
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+  color: ${({ theme }) => (theme === "dark" ? "#e2e8f0" : "#2d3748")};
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: ${({ theme }) =>
+      theme === "dark" ? "#4a5568" : "#edf2f7"};
+  }
+`;
 
 const NavBarContainer = styled(animated.nav)`
   display: flex;
@@ -33,7 +123,7 @@ const NavBarContainer = styled(animated.nav)`
   box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
   position: fixed;
   top: 0;
-  z-index: 1000;
+  z-index: 100;
   transition: all 0.3s ease;
 
   @media (max-width: 768px) {
@@ -320,20 +410,36 @@ function Layout({ children }) {
         <NavItems>
           {userRole !== "P" && (
             <AdminButton theme={theme} onClick={() => navigate("/admin-panel")}>
-              <span className="material-symbols-outlined">
-                admin_panel_settings
-              </span>
+              Admin Panel
             </AdminButton>
           )}
           <NavItem onClick={() => navigate("/prod")} theme={theme}>
-            <ReportIcon className="material-icon" />
+            Current Production
           </NavItem>
           <NavItem onClick={() => navigate("/pumper")} theme={theme}>
-            <PumperIcon className="material-icon" />
+            Gauge Entry
           </NavItem>
           <NavItem onClick={() => navigate("/Charts")} theme={theme}>
-            <ChartIcon className="material-icon" />
+            Charts
           </NavItem>
+          <NavDropdown theme={theme}>
+            <summary>Inventory</summary>
+            <NavDropdownItem onClick={() => navigate("/inv?type=lease")}>
+              By Lease
+            </NavDropdownItem>
+            <NavDropdownItem onClick={() => navigate("/inv?type=tank")}>
+              By Tank
+            </NavDropdownItem>
+          </NavDropdown>
+          <NavDropdown theme={theme}>
+            <summary>Reports</summary>
+            <NavDropdownItem onClick={() => navigate("/reports")}>
+              By Lease
+            </NavDropdownItem>
+            <NavDropdownItem onClick={() => navigate("/prodSummary")}>
+              Production Summary
+            </NavDropdownItem>
+          </NavDropdown>
           <NavItem onClick={toggleProfileCard} theme={theme}>
             <span className="material-symbols-outlined">account_circle</span>
           </NavItem>
@@ -358,9 +464,9 @@ function Layout({ children }) {
                 </UserAvatar>
                 <UserName>{userID ? userID : "Signed in"}</UserName>
                 <UserRole>Hello {capitalizeFirstLetter(userID)}!</UserRole>
-                <SignOutButton onClick={handleDetailsClick}>
+                <DetailsButton onClick={handleDetailsClick}>
                   Profile Details
-                </SignOutButton>
+                </DetailsButton>
               </ProfileCard>
             </OutsideClickHandler>
           )}

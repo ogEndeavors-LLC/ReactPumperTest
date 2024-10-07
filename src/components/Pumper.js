@@ -1,13 +1,33 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FiBarChart, FiFileText, FiDroplet } from "react-icons/fi";
+import { FiBarChart, FiFileText, FiDroplet, FiUser } from "react-icons/fi";
 import { useTheme } from "./ThemeContext";
 import { baseUrl } from "./config"; // Import baseUrl from config
+import { useUser } from "./UserContext";
 
 const GaugeEntry = () => {
   const { theme } = useTheme();
   const [wells, setWells] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedOption, setSelectedOption] = useState("");
+  const { userID } = useUser();
+  const [userDetails, setUserDetails] = useState(null);
+
+  const fetchUserDetails = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `${baseUrl}/api/userdetails.php?id=${userID}`
+      );
+      if (!response.ok) throw new Error("Network response was not ok");
+      const data = await response.json();
+      if (data.success) {
+        setUserDetails(data.user);
+      } else {
+        console.error("Failed to fetch user details");
+      }
+    } catch (error) {
+      console.error("Error fetching user details:", error);
+    }
+  }, [userID]);
 
   const fetchLeases = useCallback(async () => {
     try {
@@ -35,9 +55,10 @@ const GaugeEntry = () => {
 
   useEffect(() => {
     fetchLeases();
+    fetchUserDetails();
     const currentDate = new Date().toISOString().split("T")[0];
     setSelectedDate(currentDate);
-  }, [fetchLeases]);
+  }, [fetchLeases, fetchUserDetails]);
 
   return (
     <div
@@ -52,13 +73,50 @@ const GaugeEntry = () => {
           theme === "dark" ? "bg-gray-800" : "bg-white"
         } shadow-2xl rounded-2xl p-6 sm:p-8 max-w-md w-full mt-8`}
       >
-        <h1
-          className={`text-2xl sm:text-4xl font-extrabold mb-8 text-center tracking-wide ${
-            theme === "dark" ? "text-gray-100" : "text-gray-800"
+        {/* Enhanced "Hi user, Message" section */}
+        <div
+          className={`flex items-center justify-center mb-8 p-4 rounded-xl shadow-lg ${
+            theme === "dark" ? "bg-gray-700" : "bg-gray-100"
           }`}
         >
-          Gauge Entry
-        </h1>
+          <div className="flex-shrink-0 mr-4">
+            {userDetails?.avatarUrl ? (
+              <img
+                className="h-16 w-16 rounded-full object-cover"
+                src={userDetails.avatarUrl}
+                alt="User Avatar"
+              />
+            ) : (
+              <div
+                className={`h-16 w-16 rounded-full flex items-center justify-center ${
+                  theme === "dark" ? "bg-gray-600" : "bg-gray-300"
+                }`}
+              >
+                <FiUser
+                  className={`h-8 w-8 ${
+                    theme === "dark" ? "text-gray-200" : "text-gray-700"
+                  }`}
+                />
+              </div>
+            )}
+          </div>
+          <div>
+            <h1
+              className={`text-xl sm:text-xl font-bold tracking-wide ${
+                theme === "dark" ? "text-gray-100" : "text-gray-800"
+              }`}
+            >
+              {userDetails ? `Hi, ${userDetails.UserID}!` : "Loading..."}
+            </h1>
+            <p
+              className={`mt-1 text-lg ${
+                theme === "dark" ? "text-gray-300" : "text-gray-600"
+              }`}
+            >
+              {userDetails?.Message}
+            </p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 gap-6">
           <div>
@@ -89,7 +147,7 @@ const GaugeEntry = () => {
             >
               {wells.map((well, index) => (
                 <option key={index} value={well.WellName}>
-                  {well.WellName} - {well.LeaseName}
+                  {well.WellName} {well.LeaseName}
                 </option>
               ))}
             </select>
@@ -106,18 +164,9 @@ const GaugeEntry = () => {
               value={selectedOption}
               onChange={(e) => setSelectedOption(e.target.value)}
             >
-              <option value="Daily Gauges">
-                <FiBarChart className="inline-block mr-2" />
-                Daily Gauges
-              </option>
-              <option value="Add Run Ticket">
-                <FiFileText className="inline-block mr-2" />
-                Run Ticket
-              </option>
-              <option value="Add Water Tank Ticket">
-                <FiDroplet className="inline-block mr-2" />
-                Water Tank
-              </option>
+              <option value="Daily Gauges">Daily Gauges</option>
+              <option value="Add Run Ticket">Run Ticket</option>
+              <option value="Add Water Tank Ticket">Water Tank</option>
             </select>
           </div>
 

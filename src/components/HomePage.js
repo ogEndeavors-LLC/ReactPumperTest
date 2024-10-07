@@ -43,9 +43,7 @@ const Homepage = () => {
           className={`text-4xl sm:text-6xl font-extrabold mb-12 text-center tracking-wide ${
             isDarkMode ? "text-gray-100" : "text-gray-800"
           }`}
-        >
-          Admin Dashboard
-        </h1>
+        ></h1>
 
         {/* Grid container for dashboard sections */}
         <div className="grid grid-cols-1 gap-8">

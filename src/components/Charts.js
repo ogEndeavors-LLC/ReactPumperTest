@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { SketchPicker } from "react-color";
 import { useUser } from "./UserContext";
+import { useTheme } from "./ThemeContext";
 import debounce from "lodash/debounce";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -25,9 +26,9 @@ import {
   faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
 import moment from "moment";
-import { baseUrl } from "./config";
-import { useTheme } from "./ThemeContext";
+import { baseUrl } from "./config"; // Import the baseUrl
 
+// Helper function to filter out zero or negative values
 const filterLogarithmicData = (data) => {
   return data.map((item) => ({
     ...item,
@@ -41,12 +42,13 @@ const filterLogarithmicData = (data) => {
 };
 
 const ChartComponent = () => {
-  const { theme } = useTheme(); // Access theme from context
+  const { theme } = useTheme();
   const [reportType, setReportType] = useState("CD");
   const { user } = useUser();
   const { userRole, userID } = useUser();
   const [selectedWellID, setSelectedWellID] = useState("");
   const [wells, setWells] = useState([]);
+  const [isParamsLoaded, setIsParamsLoaded] = useState(false);
 
   const chartRef = useRef(null);
   const [data, setData] = useState([]);
@@ -69,20 +71,20 @@ const ChartComponent = () => {
     SND: "line",
   });
   const [colors, setColors] = useState({
-    Oil: theme.colors.oil || "#FF7F0E",
-    ProducedWater: theme.colors.producedWater || "#2CA02C",
-    InjectedWater: theme.colors.injectedWater || "#1F77B4",
-    Tbg: theme.colors.tbg || "#D62728",
-    Csg: theme.colors.csg || "#9467BD",
-    Gas: theme.colors.gas || "#8C564B",
-    TestOil: theme.colors.testOil || "#FF7F0E",
-    TestWater: theme.colors.testWater || "#2CA02C",
-    TestGas: theme.colors.testGas || "#8C564B",
-    JTF: theme.colors.jtf || "#FFBB78",
-    FTF: theme.colors.ftf || "#98DF8A",
-    FAP: theme.colors.fap || "#AEC7E8",
-    GFFAP: theme.colors.gffap || "#FF9896",
-    SND: theme.colors.snd || "#C5B0D5",
+    Oil: "#FF7F0E",
+    ProducedWater: "#2CA02C",
+    InjectedWater: "#1F77B4",
+    Tbg: "#D62728",
+    Csg: "#9467BD",
+    Gas: "#8C564B",
+    TestOil: "#FF7F0E",
+    TestWater: "#2CA02C",
+    TestGas: "#8C564B",
+    JTF: "#FFBB78",
+    FTF: "#98DF8A",
+    FAP: "#AEC7E8",
+    GFFAP: "#FF9896",
+    SND: "#C5B0D5",
   });
   const [colorPicker, setColorPicker] = useState({
     visible: false,
@@ -103,6 +105,34 @@ const ChartComponent = () => {
   const [tags, setTags] = useState(["All"]);
   const [chartView, setChartView] = useState("production");
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const leaseIdFromUrl = params.get("LeaseID");
+    if (leaseIdFromUrl) {
+      setSelectedLeaseID(leaseIdFromUrl);
+    }
+
+    const dateFromUrl = params.get("Date");
+    if (dateFromUrl) {
+      setThruDate(dateFromUrl);
+      const fromDateCalculated = moment(dateFromUrl)
+        .subtract(30, "days")
+        .format("YYYY-MM-DD");
+      setFromDate(fromDateCalculated);
+    }
+
+    const fromDateFromUrl = params.get("FromDate");
+    if (fromDateFromUrl) {
+      setFromDate(fromDateFromUrl);
+    }
+
+    const thruDateFromUrl = params.get("ThruDate");
+    if (thruDateFromUrl) {
+      setThruDate(thruDateFromUrl);
+    }
+
+    setIsParamsLoaded(true); // Indicate that URL params have been loaded
+  }, []);
   const formatXAxis = (tickItem) => {
     let date;
     if (reportType === "CM" && chartView === "production") {
@@ -121,6 +151,9 @@ const ChartComponent = () => {
       const data = await response.json();
 
       if (data.success && data.ChartsPref) {
+        console.log("data.ChartsPref");
+
+        console.log(data.ChartsPref);
         const { chartTypes, colors, logarithmic, disabledSeries } =
           data.ChartsPref;
         setChartTypes({
@@ -226,6 +259,8 @@ const ChartComponent = () => {
   }, [fetchPreferences, fetchLeases]);
 
   useEffect(() => {
+    if (!isParamsLoaded) return; // Wait until URL params are loaded
+
     let isMounted = true;
     const fetchData = async () => {
       setIsLoading(true);
@@ -251,8 +286,7 @@ const ChartComponent = () => {
     return () => {
       isMounted = false;
     };
-  }, [chartView, fetchChartData, fetchWellTestData]);
-
+  }, [isParamsLoaded, chartView, fetchChartData, fetchWellTestData]);
   const debouncedSavePreferences = useCallback(
     debounce(async () => {
       try {
@@ -287,6 +321,10 @@ const ChartComponent = () => {
 
   const handleQuickLinkChange = (qd) => {
     setQuickLink(qd);
+    if (qd === "custom") {
+      // Do nothing, user will set fromDate and thruDate manually
+      return;
+    }
     let newFromDate, newThruDate;
     const today = moment();
 
@@ -358,6 +396,105 @@ const ChartComponent = () => {
     setFromDate(newFromDate);
     setThruDate(newThruDate);
   };
+
+  useEffect(() => {
+    const today = moment().startOf("day");
+    let matchedQuickLink = null;
+
+    // Last 3 Days
+    if (
+      fromDate === today.clone().subtract(2, "days").format("YYYY-MM-DD") &&
+      thruDate === today.format("YYYY-MM-DD")
+    ) {
+      matchedQuickLink = "3D";
+    }
+    // Last 7 Days
+    else if (
+      fromDate === today.clone().subtract(6, "days").format("YYYY-MM-DD") &&
+      thruDate === today.format("YYYY-MM-DD")
+    ) {
+      matchedQuickLink = "7D";
+    }
+    // Last 30 days
+    else if (
+      fromDate === today.clone().subtract(29, "days").format("YYYY-MM-DD") &&
+      thruDate === today.format("YYYY-MM-DD")
+    ) {
+      matchedQuickLink = "30";
+    }
+    // Current Month
+    else if (
+      fromDate === today.clone().startOf("month").format("YYYY-MM-DD") &&
+      thruDate === today.clone().endOf("month").format("YYYY-MM-DD")
+    ) {
+      matchedQuickLink = "CM";
+    }
+    // Last Month
+    else if (
+      fromDate ===
+        today
+          .clone()
+          .subtract(1, "month")
+          .startOf("month")
+          .format("YYYY-MM-DD") &&
+      thruDate ===
+        today.clone().subtract(1, "month").endOf("month").format("YYYY-MM-DD")
+    ) {
+      matchedQuickLink = "LM";
+    }
+    // Last 3 Months
+    else if (
+      fromDate ===
+        today
+          .clone()
+          .subtract(3, "months")
+          .add(1, "day")
+          .format("YYYY-MM-DD") &&
+      thruDate === today.format("YYYY-MM-DD")
+    ) {
+      matchedQuickLink = "3M";
+    }
+    // Last 6 Months
+    else if (
+      fromDate ===
+        today
+          .clone()
+          .subtract(6, "months")
+          .add(1, "day")
+          .format("YYYY-MM-DD") &&
+      thruDate === today.format("YYYY-MM-DD")
+    ) {
+      matchedQuickLink = "6M";
+    }
+    // Current Year
+    else if (
+      fromDate === today.clone().startOf("year").format("YYYY-MM-DD") &&
+      thruDate === today.format("YYYY-MM-DD")
+    ) {
+      matchedQuickLink = "CY";
+    }
+    // Last Year
+    else if (
+      fromDate ===
+        today
+          .clone()
+          .subtract(1, "year")
+          .startOf("year")
+          .format("YYYY-MM-DD") &&
+      thruDate ===
+        today.clone().subtract(1, "year").endOf("year").format("YYYY-MM-DD")
+    ) {
+      matchedQuickLink = "LY";
+    }
+    // Default to custom range
+    else {
+      matchedQuickLink = "custom";
+    }
+
+    if (matchedQuickLink !== quickLink) {
+      setQuickLink(matchedQuickLink);
+    }
+  }, [fromDate, thruDate]);
 
   const handleToggle = (field) => {
     setChartTypes((prev) => ({
@@ -448,6 +585,7 @@ const ChartComponent = () => {
       leases.find((lease) => lease.LeaseID === selectedLeaseID)?.LeaseName ||
       "All Leases";
 
+    // Function to format date to m/d/yy
     const formatDate = (dateString) => {
       const date = new Date(dateString);
       return `${date.getMonth() + 1}/${date.getDate()}/${date
@@ -546,7 +684,6 @@ const ChartComponent = () => {
     document.body.innerHTML = originalContents;
     window.location.reload();
   };
-
   const handleEditClick = () => {
     setIsSidePanelOpen(!isSidePanelOpen);
     setIsEditing(!isEditing);
@@ -564,14 +701,9 @@ const ChartComponent = () => {
           <div className="filters">
             <div className="filter-group">
               <div className="filter-item">
-                <label>Time Range</label>
                 <select
                   value={quickLink}
                   onChange={(e) => handleQuickLinkChange(e.target.value)}
-                  style={{
-                    backgroundColor: theme.selectBgColor,
-                    color: theme.textColor,
-                  }}
                 >
                   <option value="30">Last 30 days</option>
                   <option value="CM">Current Month</option>
@@ -582,81 +714,70 @@ const ChartComponent = () => {
                   <option value="6M">Last 6 months</option>
                   <option value="CY">Current Year</option>
                   <option value="LY">Last Year</option>
+                  <option value="custom">Custom Range</option>
                 </select>
               </div>
               <div className="filter-item">
-                <label>From</label>
                 <input
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  style={{
-                    backgroundColor: theme.inputBgColor,
-                    color: theme.textColor,
-                  }}
                 />
               </div>
               <div className="filter-item">
-                <label>To</label>
                 <input
                   type="date"
                   value={thruDate}
                   onChange={(e) => setThruDate(e.target.value)}
-                  style={{
-                    backgroundColor: theme.inputBgColor,
-                    color: theme.textColor,
-                  }}
                 />
               </div>
 
               <div className="filter-item">
-                <label>Lease</label>
-                <select
-                  value={selectedLeaseID}
-                  onChange={(e) => setSelectedLeaseID(e.target.value)}
-                  style={{
-                    backgroundColor: theme.selectBgColor,
-                    color: theme.textColor,
-                  }}
-                >
-                  {chartView === "production" ? (
-                    <option value="~ALL~">All Leases</option>
-                  ) : (
-                    leases.length > 0 && (
-                      <option value={leases[0].LeaseID} key={leases[0].LeaseID}>
-                        {leases[0].LeaseName}
-                      </option>
-                    )
-                  )}
-                  {leases
-                    .filter(
-                      (lease) =>
-                        chartView === "production" || lease.WellType !== "INJ"
-                    )
-                    .map((lease, index) => (
-                      <option
-                        key={lease.LeaseID}
-                        value={lease.LeaseID}
-                        selected={chartView !== "production" && index === 0}
-                      >
-                        {lease.LeaseName}
-                      </option>
-                    ))}
-                </select>
-                <button className="next-well-button" onClick={handleNextLease}>
-                  <FontAwesomeIcon icon={faArrowRight} />
-                </button>
+                <div className="select-with-button">
+                  <select
+                    value={selectedLeaseID}
+                    onChange={(e) => setSelectedLeaseID(e.target.value)}
+                  >
+                    {chartView === "production" ? (
+                      <option value="~ALL~">All Leases</option>
+                    ) : (
+                      leases.length > 0 && (
+                        <option
+                          value={leases[0].LeaseID}
+                          key={leases[0].LeaseID}
+                        >
+                          {leases[0].LeaseName}
+                        </option>
+                      )
+                    )}
+                    {leases
+                      .filter(
+                        (lease) =>
+                          chartView === "production" || lease.WellType !== "INJ"
+                      )
+                      .map((lease, index) => (
+                        <option
+                          key={lease.LeaseID}
+                          value={lease.LeaseID}
+                          selected={chartView !== "production" && index === 0}
+                        >
+                          {lease.LeaseName}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    className="next-well-button"
+                    onClick={handleNextLease}
+                  >
+                    <FontAwesomeIcon icon={faArrowRight} />
+                  </button>
+                </div>
               </div>
               {chartView === "production" ? (
                 <div className="filter-item">
-                  <label>Tag</label>
                   <select
                     value={selectedTag}
                     onChange={(e) => setSelectedTag(e.target.value)}
-                    style={{
-                      backgroundColor: theme.selectBgColor,
-                      color: theme.textColor,
-                    }}
                   >
                     {tags.map((tag) => (
                       <option key={tag} value={tag}>
@@ -667,38 +788,33 @@ const ChartComponent = () => {
                 </div>
               ) : (
                 <div className="filter-item">
-                  <label>Well</label>
-                  <select
-                    value={selectedWellID}
-                    onChange={(e) => setSelectedWellID(e.target.value)}
-                    disabled={selectedLeaseID === "~ALL~"}
-                    style={{
-                      backgroundColor: theme.selectBgColor,
-                      color: theme.textColor,
-                    }}
-                  >
-                    <option value="">Select a well</option>
-                    {wells.map((well) => (
-                      <option key={well.UniqID} value={well.WellID}>
-                        {well.WellID}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="next-well-button" onClick={handleNextWell}>
-                    <FontAwesomeIcon icon={faArrowRight} />
-                  </button>
+                  <div className="select-with-button">
+                    <select
+                      value={selectedWellID}
+                      onChange={(e) => setSelectedWellID(e.target.value)}
+                      disabled={selectedLeaseID === "~ALL~"}
+                    >
+                      <option value="">Select a well</option>
+                      {wells.map((well) => (
+                        <option key={well.UniqID} value={well.WellID}>
+                          {well.WellID}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="next-well-button"
+                      onClick={handleNextWell}
+                    >
+                      <FontAwesomeIcon icon={faArrowRight} />
+                    </button>
+                  </div>
                 </div>
               )}
               {chartView === "production" && (
                 <div className="filter-item">
-                  <label>Report Type</label>
                   <select
                     value={reportType}
                     onChange={(e) => setReportType(e.target.value)}
-                    style={{
-                      backgroundColor: theme.selectBgColor,
-                      color: theme.textColor,
-                    }}
                   >
                     <option value="CD">Daily</option>
                     <option value="CM">Monthly</option>
@@ -711,20 +827,12 @@ const ChartComponent = () => {
             <button
               className="action-button print-button"
               onClick={handlePrint}
-              style={{
-                backgroundColor: theme.buttonBgColor,
-                color: theme.buttonTextColor,
-              }}
             >
               <FontAwesomeIcon icon={faPrint} className="icon" /> Print
             </button>
             <button
               className="action-button settings-button"
               onClick={handleEditClick}
-              style={{
-                backgroundColor: theme.buttonBgColor,
-                color: theme.buttonTextColor,
-              }}
             >
               <FontAwesomeIcon
                 icon={isSidePanelOpen ? faTimes : faCog}
@@ -734,11 +842,7 @@ const ChartComponent = () => {
             </button>
           </div>
         </div>
-        <div
-          ref={chartRef}
-          className="chart-container-inner"
-          style={{ backgroundColor: theme.chartBgColor }}
-        >
+        <div ref={chartRef} className="chart-container-inner">
           {isLoading ? (
             <div className="loading-spinner"></div>
           ) : (
@@ -751,12 +855,7 @@ const ChartComponent = () => {
                   dataKey="GaugeDate"
                   tickFormatter={formatXAxis}
                   interval="preserveStartEnd"
-                  tick={{
-                    fontSize: 12,
-                    angle: -45,
-                    textAnchor: "end",
-                    fill: theme.axisTextColor,
-                  }}
+                  tick={{ fontSize: 12, angle: -45, textAnchor: "end" }}
                   height={60}
                   padding={{ left: 20, right: 20 }}
                 />
@@ -767,12 +866,7 @@ const ChartComponent = () => {
                     logarithmic ? [1, "auto"] : [0, (dataMax) => dataMax * 1.1]
                   }
                   allowDataOverflow={true}
-                  label={{
-                    value: "BBLS",
-                    angle: -90,
-                    position: "insideLeft",
-                    fill: theme.axisLabelColor,
-                  }}
+                  label={{ value: "BBLS", angle: -90, position: "insideLeft" }}
                   tickCount={logarithmic ? undefined : 7}
                   tickFormatter={(value) => {
                     if (logarithmic) {
@@ -788,7 +882,6 @@ const ChartComponent = () => {
                       ? `${(value / 1000).toFixed(1)}K`
                       : value.toFixed(1);
                   }}
-                  tick={{ fill: theme.axisTextColor }}
                 />
                 <YAxis
                   yAxisId="right"
@@ -798,12 +891,7 @@ const ChartComponent = () => {
                     logarithmic ? [1, "auto"] : [0, (dataMax) => dataMax * 1.1]
                   }
                   allowDataOverflow={true}
-                  label={{
-                    value: "MCF",
-                    angle: -90,
-                    position: "insideRight",
-                    fill: theme.axisLabelColor,
-                  }}
+                  label={{ value: "MCF", angle: -90, position: "insideRight" }}
                   tickCount={logarithmic ? undefined : 7}
                   tickFormatter={(value) => {
                     if (logarithmic) {
@@ -819,18 +907,11 @@ const ChartComponent = () => {
                       ? `${(value / 1000).toFixed(1)}K`
                       : value.toFixed(1);
                   }}
-                  tick={{ fill: theme.axisTextColor }}
                 />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: theme.tooltipBgColor,
-                    color: theme.tooltipTextColor,
-                  }}
-                />
+                <Tooltip />
                 <Legend
                   onClick={handleLegendClick}
                   formatter={renderLegendText}
-                  wrapperStyle={{ color: theme.legendTextColor }}
                 />
                 {chartView === "production" ? (
                   <>
@@ -1091,24 +1172,14 @@ const ChartComponent = () => {
               </ComposedChart>
             </ResponsiveContainer>
           )}
-          <button
-            className="reset-legend-button"
-            onClick={resetLegend}
-            style={{
-              backgroundColor: theme.buttonBgColor,
-              color: theme.buttonTextColor,
-            }}
-          >
+          <button className="reset-legend-button" onClick={resetLegend}>
             <FontAwesomeIcon icon={faRedo} className="icon" /> Reset Legend
           </button>
         </div>
-        <div
-          className={`settings-panel ${isSidePanelOpen ? "open" : ""}`}
-          style={{ backgroundColor: theme.panelBgColor }}
-        >
-          <h2 style={{ color: theme.textColor }}>Settings</h2>
+        <div className={`settings-panel ${isSidePanelOpen ? "open" : ""}`}>
+          <h2>Settings</h2>
           <div className="settings-section">
-            <h3 style={{ color: theme.textColor }}>Chart Type and Color</h3>
+            <h3>Chart Type and Color</h3>
             {Object.entries(
               chartView === "production"
                 ? {
@@ -1133,15 +1204,11 @@ const ChartComponent = () => {
                   }
             ).map(([field, type]) => (
               <div key={field} className="settings-item">
-                <span style={{ color: theme.textColor }}>{field}</span>
+                <span>{field}</span>
                 <div className="chart-controls">
                   <button
                     className="chart-type-button"
                     onClick={() => handleToggle(field)}
-                    style={{
-                      backgroundColor: theme.buttonBgColor,
-                      color: theme.buttonTextColor,
-                    }}
                   >
                     {type === "line" ? (
                       <FontAwesomeIcon icon={faChartBar} />
@@ -1159,11 +1226,8 @@ const ChartComponent = () => {
             ))}
           </div>
           <div className="settings-section">
-            <h3 style={{ color: theme.textColor }}>Y-Axis Scale</h3>
-            <label
-              className="checkbox-label"
-              style={{ color: theme.textColor }}
-            >
+            <h3>Y-Axis Scale</h3>
+            <label className="checkbox-label">
               <input
                 type="checkbox"
                 checked={logarithmic}
@@ -1174,11 +1238,8 @@ const ChartComponent = () => {
           </div>
           {chartView === "production" && (
             <div className="settings-section">
-              <h3 style={{ color: theme.textColor }}>Stacked Options</h3>
-              <label
-                className="checkbox-label"
-                style={{ color: theme.textColor }}
-              >
+              <h3>Stacked Options</h3>
+              <label className="checkbox-label">
                 <input
                   type="checkbox"
                   checked={stacked}
@@ -1199,10 +1260,6 @@ const ChartComponent = () => {
               <button
                 className="close-button"
                 onClick={() => setColorPicker({ visible: false, field: null })}
-                style={{
-                  backgroundColor: theme.buttonBgColor,
-                  color: theme.buttonTextColor,
-                }}
               >
                 Close
               </button>
@@ -1210,14 +1267,7 @@ const ChartComponent = () => {
           </div>
         )}
         <div className="fab-container">
-          <button
-            className="fab"
-            onClick={handleChartViewChange}
-            style={{
-              backgroundColor: theme.fabBgColor,
-              color: theme.fabTextColor,
-            }}
-          >
+          <button className="fab" onClick={handleChartViewChange}>
             <FontAwesomeIcon icon={faExchangeAlt} />
             {chartView === "production" ? "Wells" : "Prod"}
           </button>
@@ -1233,12 +1283,13 @@ const ChartComponent = () => {
           margin-top: 0px;
           width: 100%;
           box-sizing: border-box;
+          margin-top: 16;
         }
 
         .filters-container {
           width: 100%;
           max-width: 80%;
-          background: ${theme.filtersBg};
+          background: linear-gradient(to right, #ebf4ff, #dee6ff);
           border-radius: 8px;
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
           padding: 8px;
@@ -1267,15 +1318,9 @@ const ChartComponent = () => {
 
         .filter-item {
           display: flex;
-          flex-direction: column;
+          flex-direction: row;
+          align-items: center;
           margin-bottom: 0;
-        }
-
-        .filter-item label {
-          margin-bottom: 4px;
-          font-size: 12px;
-          font-weight: 500;
-          color: ${theme.textColor};
         }
 
         .filter-item select,
@@ -1283,7 +1328,7 @@ const ChartComponent = () => {
           width: 100%;
           max-width: 200px;
           padding: 4px 8px;
-          border: 1px solid ${theme.inputBorderColor};
+          border: 1px solid #d1d5db;
           border-radius: 4px;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1291,9 +1336,22 @@ const ChartComponent = () => {
 
         .filter-item select:focus,
         .filter-item input:focus {
-          border-color: ${theme.inputFocusBorderColor};
-          box-shadow: 0 0 0 2px ${theme.inputFocusShadowColor};
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
           outline: none;
+        }
+
+        .select-with-button {
+          display: flex;
+          align-items: center;
+        }
+
+        .select-with-button select {
+          flex: 1;
+        }
+
+        .select-with-button button {
+          margin-left: 8px;
         }
 
         .action-buttons {
@@ -1313,15 +1371,34 @@ const ChartComponent = () => {
           transition: background-color 0.15s ease, box-shadow 0.15s ease;
         }
 
+        .print-button {
+          background-color: #10b981;
+          color: #fff;
+          box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+        }
+
+        .print-button:hover {
+          background-color: #059669;
+        }
+
+        .settings-button {
+          background-color: #3b82f6;
+          color: #fff;
+          box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+        }
+
+        .settings-button:hover {
+          background-color: #2563eb;
+        }
+
         .next-lease-button,
         .next-well-button {
           display: inline-flex;
           align-items: center;
           justify-content: center;
           padding: 4px;
-          margin-left: 10px;
           background-color: transparent;
-          color: ${theme.iconColor};
+          color: #1d72b8;
           border: none;
           cursor: pointer;
           transition: color 0.3s ease;
@@ -1329,19 +1406,24 @@ const ChartComponent = () => {
 
         .next-lease-button:hover,
         .next-well-button:hover {
-          color: ${theme.iconHoverColor};
+          color: #155a8a;
         }
 
         .next-lease-button:focus,
         .next-well-button:focus {
           outline: none;
-          box-shadow: 0 0 0 2px ${theme.iconFocusColor};
+          box-shadow: 0 0 0 2px rgba(29, 114, 184, 0.4);
+        }
+
+        .next-lease-button .fa-icon,
+        .next-well-button .fa-icon {
+          margin-left: 0;
         }
 
         .chart-container-inner {
           width: 100%;
           max-width: 100%;
-          background-color: ${theme.chartBgColor};
+          background-color: #ffffff;
           border-radius: 8px;
           padding: 32px;
           margin-bottom: 32px;
@@ -1360,8 +1442,8 @@ const ChartComponent = () => {
           display: block;
           width: 64px;
           height: 64px;
-          border: 8px solid ${theme.spinnerBgColor};
-          border-top: 8px solid ${theme.spinnerColor};
+          border: 8px solid #f3f4f6;
+          border-top: 8px solid #3b82f6;
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }
@@ -1378,8 +1460,8 @@ const ChartComponent = () => {
         .reset-legend-button {
           margin-top: 16px;
           padding: 8px 16px;
-          background-color: ${theme.buttonBgColor};
-          color: ${theme.buttonTextColor};
+          background-color: #3b82f6;
+          color: #fff;
           border-radius: 4px;
           display: flex;
           align-items: center;
@@ -1391,7 +1473,7 @@ const ChartComponent = () => {
         }
 
         .reset-legend-button:hover {
-          background-color: ${theme.buttonHoverColor};
+          background-color: #2563eb;
         }
 
         .settings-panel {
@@ -1403,7 +1485,7 @@ const ChartComponent = () => {
           overflow-y: auto;
           width: 280px;
           padding: 24px;
-          background-color: ${theme.panelBgColor};
+          background-color: #ffffff;
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
           transition: right 0.3s ease-in-out;
         }
@@ -1416,7 +1498,6 @@ const ChartComponent = () => {
           font-size: 18px;
           font-weight: 700;
           margin-bottom: 16px;
-          color: ${theme.textColor};
         }
 
         .settings-section {
@@ -1427,7 +1508,6 @@ const ChartComponent = () => {
           font-size: 16px;
           font-weight: 600;
           margin-bottom: 8px;
-          color: ${theme.textColor};
         }
 
         .settings-item {
@@ -1446,8 +1526,8 @@ const ChartComponent = () => {
         .chart-type-button {
           padding: 6px;
           border-radius: 4px;
-          background-color: ${theme.buttonBgColor};
-          color: ${theme.buttonTextColor};
+          background-color: #3b82f6;
+          color: #fff;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1456,7 +1536,7 @@ const ChartComponent = () => {
         }
 
         .chart-type-button:hover {
-          background-color: ${theme.buttonHoverColor};
+          background-color: #2563eb;
         }
 
         .color-box {
@@ -1489,7 +1569,7 @@ const ChartComponent = () => {
         }
 
         .color-picker-container {
-          background-color: ${theme.panelBgColor};
+          background-color: #ffffff;
           padding: 24px;
           border-radius: 8px;
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -1498,8 +1578,8 @@ const ChartComponent = () => {
         .close-button {
           margin-top: 16px;
           padding: 8px 16px;
-          background-color: ${theme.closeButtonBgColor};
-          color: ${theme.closeButtonTextColor};
+          background-color: #ef4444;
+          color: #fff;
           border-radius: 4px;
           display: flex;
           align-items: center;
@@ -1511,7 +1591,7 @@ const ChartComponent = () => {
         }
 
         .close-button:hover {
-          background-color: ${theme.closeButtonHoverColor};
+          background-color: #dc2626;
         }
 
         .fab-container {
@@ -1525,8 +1605,8 @@ const ChartComponent = () => {
           width: 56px;
           height: 56px;
           border-radius: 28px;
-          background-color: ${theme.fabBgColor};
-          color: ${theme.fabTextColor};
+          background-color: #3b82f6;
+          color: white;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1537,7 +1617,7 @@ const ChartComponent = () => {
         }
 
         .fab:hover {
-          background-color: ${theme.fabHoverBgColor};
+          background-color: #2563eb;
           box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         }
       `}</style>
