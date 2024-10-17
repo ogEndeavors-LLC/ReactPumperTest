@@ -3,7 +3,7 @@ const getBaseUrl = () => {
   const hostname = window.location.hostname;
   const parts = hostname.split(".");
 
-  if (parts.length > 2 && parts[1] === "ogfieldticket") {
+  if (parts.length > 2 && parts[1] === "ogpumper") {
     return `https://${parts[0]}.ogpumper.com`;
   }
 
