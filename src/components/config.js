@@ -4,7 +4,7 @@ const getBaseUrl = () => {
   const parts = hostname.split(".");
 
   if (parts.length > 2 && parts[1] === "ogfieldticket") {
-    return `https://${parts[0]}.ogfieldticket.com`;
+    return `https://${parts[0]}.ogpumper.com`;
   }
 
   return "https://test.ogfieldticket.com"; // Fallback base URL

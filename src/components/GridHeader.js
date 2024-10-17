@@ -32,6 +32,11 @@ const Header = ({
   toggleShowPriorDay,
   handleExport,
   handlePrint,
+  reportType, // New prop for report type dropdown
+  handleReportTypeChange, // New prop function for report type change
+  leaseID, // New prop for lease dropdown
+  leases, // New prop for lease options
+  handleLeaseChange, // New prop function for lease change
   children,
 }) => {
   return (
@@ -173,6 +178,47 @@ const Header = ({
           <option value="">Show All</option>
           <option value="I">Injection Only (I)</option>
           <option value="P">Production Only (P)</option>
+        </select>
+      )}
+
+      {/* Report Type Dropdown */}
+      {handleReportTypeChange && (
+        <select
+          value={reportType}
+          onChange={handleReportTypeChange}
+          className={`w-32 ${
+            isDarkMode
+              ? "bg-gray-800 text-gray-200 border-none"
+              : "bg-white text-black border border-gray-300"
+          } text-base px-2 py-1 rounded`}
+        >
+          <option value="P">Production</option>
+
+          <option value="Y">Yearly Production</option>
+          <option value="T">Gauges by Tank</option>
+          <option value="D">Gauges by Date</option>
+          <option value="O">Gauges OH Bbls</option>
+          <option value="W">Wells On/Off</option>
+          <option value="WE">Well Tests</option>
+        </select>
+      )}
+
+      {/* Lease Dropdown */}
+      {handleLeaseChange && (
+        <select
+          value={leaseID}
+          onChange={handleLeaseChange}
+          className={`w-32 ${
+            isDarkMode
+              ? "bg-gray-800 text-gray-200 border-none"
+              : "bg-white text-black border border-gray-300"
+          } text-base px-2 py-1 rounded`}
+        >
+          {leases.map((lease) => (
+            <option key={lease.LeaseID} value={lease.LeaseID}>
+              {lease.LeaseName}
+            </option>
+          ))}
         </select>
       )}
 
