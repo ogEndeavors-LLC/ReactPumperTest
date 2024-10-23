@@ -11,7 +11,7 @@ import PumperIcon from "@mui/icons-material/BuildCircle";
 import ChartIcon from "@mui/icons-material/ShowChart"; // Import the Chart Icon
 import Footer from "./Footer";
 import logo from "../assets/100.png";
-
+import moment from "moment";
 const GlobalStyle = createGlobalStyle`
   body {
     font-family: 'Inter', sans-serif;
@@ -427,7 +427,18 @@ function Layout({ children }) {
             <NavDropdownItem onClick={() => navigate("/inv?type=lease")}>
               By Lease
             </NavDropdownItem>
-            <NavDropdownItem onClick={() => navigate("/inv?type=tank")}>
+            <NavDropdownItem
+              onClick={() => {
+                const startDate = moment()
+                  .subtract(1, "month")
+                  .startOf("month")
+                  .format("YYYY-MM-DD");
+                const thruDate = moment().format("YYYY-MM-DD");
+                navigate(
+                  `/reports?Rpt=O&LeaseID=&StartDate=${startDate}&Thru=${thruDate}`
+                );
+              }}
+            >
               By Tank
             </NavDropdownItem>
           </NavDropdown>

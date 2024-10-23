@@ -20,6 +20,7 @@ const InventoryByLease = () => {
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   const fetchData = async () => {
     setLoading(true);
@@ -75,11 +76,131 @@ const InventoryByLease = () => {
   const handleSearchChange = (e) => setSearchText(e.target.value);
 
   const handleExport = () => {
-    // ... (export logic remains unchanged)
+    const csvRows = [];
+    const headers = columnDefs.map((col) => col.headerName);
+    csvRows.push(headers.join(","));
+
+    filteredData.forEach((row) => {
+      const values = columnDefs.map((col) => {
+        let cellValue = row[col.field];
+
+        // Escape and wrap other cell values
+        if (cellValue !== null && cellValue !== undefined) {
+          cellValue = String(cellValue).replace(/"/g, '""');
+        } else {
+          cellValue = "";
+        }
+
+        // Wrap the cell value in double quotes
+        return `"${cellValue}"`;
+      });
+      csvRows.push(values.join(","));
+    });
+
+    const csvContent = csvRows.join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+
+    // Create a download link and trigger the download
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `export_${moment(currentDate).format("MM-DD-YYYY")}.csv`; // Use state currentDate
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handlePrint = () => {
-    // ... (print logic remains unchanged)
+    const printWindow = window.open("", "_blank");
+
+    // **Exclude the "Chart" column when printing**
+    const printColumns = columnDefs.filter((col) => col.headerName !== "Chart");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Lease Inventory</title>
+          <style>
+            @page {
+              size: landscape;
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              font-size: 8px; 
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            table { 
+              border-collapse: collapse; 
+              width: 100%; 
+              page-break-inside: auto;
+            }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            th, td { 
+              border: 1px solid #ddd; 
+              padding: 2px; 
+              text-align: left; 
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            th { background-color: #f2f2f2; }
+            .number { text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h1>Lease Inventory</h1>
+          <p>Date: ${moment(currentDate).format("MM-DD-YYYY")}</p>
+          <table>
+            <thead>
+              <tr>
+                ${printColumns
+                  .map((col) => `<th>${col.headerName}</th>`)
+                  .join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${[...filteredData]
+                .map(
+                  (row, index) => `
+                  <tr class="${index === 0 ? "total-row" : ""}">
+                    ${printColumns
+                      .map((col) => {
+                        let cellValue = row[col.field];
+
+                        // Apply value formatting if defined
+                        if (col.valueFormatter) {
+                          cellValue = col.valueFormatter({ value: cellValue });
+                        }
+
+                        // Special handling for ImageCount field
+                        if (col.field === "ImageCount" && row.ImageCount > 0) {
+                          cellValue = "Yes";
+                        }
+
+                        return `<td class="${
+                          col.cellStyle?.textAlign === "right" ? "number" : ""
+                        }">${cellValue || ""}</td>`;
+                      })
+                      .join("")}
+                  </tr>
+                `
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+
+    printWindow.onload = function () {
+      printWindow.print();
+      printWindow.onafterprint = function () {
+        printWindow.close();
+      };
+    };
   };
 
   const columnDefs = useMemo(

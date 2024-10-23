@@ -10,7 +10,7 @@ import {
   FaTachometerAlt,
 } from "react-icons/fa";
 import { useTheme } from "./ThemeContext";
-
+import moment from "moment";
 const Homepage = () => {
   // Use the theme from context
   const { theme } = useTheme();
@@ -19,9 +19,21 @@ const Homepage = () => {
   // Determine if dark mode is active
   const isDarkMode = theme === "dark";
 
-  // Function to handle navigation to the Pumper page
+  // Navigation handlers
   const handleGaugeEntryClick = () => {
     navigate("/pumper");
+  };
+
+  const handleCurrentProductionClick = () => {
+    navigate("/prod");
+  };
+
+  const handleInventoryByLeaseClick = () => {
+    navigate("/inv?type=lease");
+  };
+
+  const handleReportsClick = () => {
+    navigate("/reports");
   };
 
   return (
@@ -53,7 +65,8 @@ const Homepage = () => {
               isDarkMode
                 ? "bg-gradient-to-br from-blue-900 to-blue-800 border-blue-600"
                 : "bg-gradient-to-br from-blue-50 to-blue-100 border-blue-400"
-            } p-10 rounded-xl shadow-lg border-t-4`}
+            } p-10 rounded-xl shadow-lg border-t-4 cursor-pointer transition-all duration-300 hover:shadow-2xl`}
+            onClick={handleCurrentProductionClick}
           >
             <h2
               className={`flex items-center justify-center text-2xl font-bold text-center ${
@@ -73,11 +86,12 @@ const Homepage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Inventory by Lease */}
             <div
-              className={`p-10 rounded-xl shadow-lg border-t-4 ${
+              className={`p-10 rounded-xl shadow-lg border-t-4 cursor-pointer transition-all duration-300 hover:shadow-2xl ${
                 isDarkMode
                   ? "bg-gray-700 border-gray-500"
                   : "bg-white border-gray-200"
               }`}
+              onClick={handleInventoryByLeaseClick}
             >
               <h2
                 className={`flex items-center text-2xl font-bold ${
@@ -93,20 +107,29 @@ const Homepage = () => {
               </h2>
             </div>
 
-            {/* Inventory by Tank */}
             <div
-              className={`p-10 rounded-xl shadow-lg border-t-4 ${
+              className={`p-10 rounded-xl shadow-lg border-t-4 cursor-pointer transition-all duration-300 hover:shadow-2xl ${
                 isDarkMode
                   ? "bg-gray-700 border-gray-500"
                   : "bg-white border-gray-200"
               }`}
+              onClick={() => {
+                const startDate = moment()
+                  .subtract(1, "month")
+                  .startOf("month")
+                  .format("YYYY-MM-DD");
+                const thruDate = moment().format("YYYY-MM-DD");
+                navigate(
+                  `/reports?Rpt=O&LeaseID=&StartDate=${startDate}&Thru=${thruDate}`
+                );
+              }}
             >
               <h2
                 className={`flex items-center text-2xl font-bold ${
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 }`}
               >
-                <FaFileAlt
+                <FaClipboardList
                   className={`h-8 w-8 ${
                     isDarkMode ? "text-gray-400" : "text-gray-400"
                   } mr-3`}
@@ -117,11 +140,12 @@ const Homepage = () => {
 
             {/* Reports */}
             <div
-              className={`p-10 rounded-xl shadow-lg border-t-4 ${
+              className={`p-10 rounded-xl shadow-lg border-t-4 cursor-pointer transition-all duration-300 hover:shadow-2xl ${
                 isDarkMode
                   ? "bg-gray-700 border-gray-500"
                   : "bg-white border-gray-200"
               }`}
+              onClick={handleReportsClick}
             >
               <h2
                 className={`flex items-center text-2xl font-bold ${

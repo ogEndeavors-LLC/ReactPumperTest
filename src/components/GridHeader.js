@@ -186,17 +186,15 @@ const Header = ({
         <select
           value={reportType}
           onChange={handleReportTypeChange}
-          className={`w-32 ${
+          className={`w-40 ${
             isDarkMode
               ? "bg-gray-800 text-gray-200 border-none"
               : "bg-white text-black border border-gray-300"
           } text-base px-2 py-1 rounded`}
         >
           <option value="P">Production</option>
-
           <option value="Y">Yearly Production</option>
           <option value="T">Gauges by Tank</option>
-          <option value="D">Gauges by Date</option>
           <option value="O">Gauges OH Bbls</option>
           <option value="W">Wells On/Off</option>
           <option value="WE">Well Tests</option>
@@ -206,8 +204,8 @@ const Header = ({
       {/* Lease Dropdown */}
       {handleLeaseChange && (
         <select
-          value={leaseID}
-          onChange={handleLeaseChange}
+          value={leaseID} // controlled by leaseID prop
+          onChange={handleLeaseChange} // triggers handleLeaseChange
           className={`w-32 ${
             isDarkMode
               ? "bg-gray-800 text-gray-200 border-none"

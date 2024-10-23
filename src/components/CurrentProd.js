@@ -173,6 +173,10 @@ const CurrentDataGrid = () => {
             wellType === "I"
               ? acc.PriorCsg + (curr.PriorCsg ? parseFloat(curr.PriorCsg) : 0)
               : null,
+          // For UIC, set it to a placeholder or leave as empty string
+          UIC: "", // Since UIC is a string, we don't sum it
+          // Sum Target if it's numeric
+          Target: acc.Target + (curr.Target ? parseFloat(curr.Target) : 0),
         };
       },
       {
@@ -192,22 +196,56 @@ const CurrentDataGrid = () => {
         csg: 0,
         PriorTbg: 0,
         PriorCsg: 0,
+        Target: 0,
+        UIC: "", // Initialize UIC as an empty string
       }
     );
 
-    totals.PrintLeaseName = "Totals"; // Change this line to set ':Total' for the Location column
+    totals.PrintLeaseName = "Totals"; // Set 'Totals' for the Location column
 
-    // Convert totals to fixed decimals
-    Object.keys(totals).forEach((key) => {
+    // Define numeric fields to format
+    const numericFields = [
+      "Produced",
+      "Gas",
+      "WaterTotal",
+      "WaterInjectedTotal",
+      "PriorProduced",
+      "PriorGas",
+      "PriorWaterTotal",
+      "PriorWaterInjectedTotal",
+      "OnHand",
+      "RunBbls",
+      "WaterHauledBbls",
+      "DrawBbls",
+      "tbg",
+      "csg",
+      "PriorTbg",
+      "PriorCsg",
+      "Target",
+    ];
+
+    // Format numeric fields to fixed decimals
+    numericFields.forEach((key) => {
       if (totals[key] !== null && !isNaN(totals[key])) {
         totals[key] = parseFloat(totals[key]).toFixed(2);
-      } else if (key !== "PrintLeaseName") {
+      } else {
         totals[key] = ""; // Set to empty string for display
       }
     });
 
+    // Optionally, handle Target differently if needed
+    // For example, if you want to display the average Target:
+    // totals.Target = data.length > 0 ? (totals.Target / data.length).toFixed(2) : "0.00";
+
     setTotalRow(totals);
   };
+
+  const handleReportClick = (leaseID) => {
+    const startDate = moment(currentDate).startOf("month").format("YYYY-MM-DD");
+    const endDate = moment(currentDate).endOf("month").format("YYYY-MM-DD");
+    window.location.href = `/reports?Rpt=P&LeaseID=${leaseID}&StartDate=${startDate}&Thru=${endDate}`;
+  };
+
   const fetchOptions = async () => {
     try {
       let apiUrl = `${baseUrl}/api/usertags.php`;
@@ -317,6 +355,23 @@ const CurrentDataGrid = () => {
         filter: true,
         pinned: "left",
         width: 150,
+        cellRenderer: (params) => (
+          <button
+            onClick={() => handleReportClick(params.data.PrintLeaseID)}
+            className={`location-button ${
+              isDarkMode ? "dark" : "light"
+            } px-2 py-1 rounded cursor-pointer`}
+            style={{
+              backgroundColor: "transparent",
+              color: isDarkMode ? "#FFD700" : "#1890ff",
+              border: "none",
+              textDecoration: "underline",
+              cursor: "pointer",
+            }}
+          >
+            {params.value}
+          </button>
+        ),
         cellStyle: (params) => ({
           backgroundColor:
             params.node.rowIndex % 2 === 0
@@ -435,8 +490,8 @@ const CurrentDataGrid = () => {
               filter: true,
               width: 100,
               cellStyle: {
-                backgroundColor: isDarkMode ? "#424242" : "#FFFFFF", // White for light mode, darker color for dark mode
-                color: isDarkMode ? "#FFFFFF" : "#000000", // Text color for dark mode and light mode
+                backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
+                color: isDarkMode ? "#FFFFFF" : "#000000",
                 opacity: 0.6,
                 whiteSpace: "nowrap",
                 textOverflow: "ellipsis",
@@ -457,8 +512,8 @@ const CurrentDataGrid = () => {
               filter: true,
               width: 100,
               cellStyle: {
-                backgroundColor: isDarkMode ? "#424242" : "#FFFFFF", // White for light mode, darker color for dark mode
-                color: isDarkMode ? "#FFFFFF" : "#000000", // Text color for dark mode and light mode
+                backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
+                color: isDarkMode ? "#FFFFFF" : "#000000",
                 opacity: 0.6,
                 whiteSpace: "nowrap",
                 textOverflow: "ellipsis",
@@ -473,6 +528,7 @@ const CurrentDataGrid = () => {
             },
           ]
         : []),
+
       // **Current Oil**
       {
         headerName: `${moment(currentDate).format("MM/DD")} Current Oil`,
@@ -493,6 +549,7 @@ const CurrentDataGrid = () => {
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
+
       // **Gas**
       {
         headerName: "Gas",
@@ -513,6 +570,7 @@ const CurrentDataGrid = () => {
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
+
       // **Water**
       {
         headerName: "Water",
@@ -533,6 +591,7 @@ const CurrentDataGrid = () => {
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
+
       // **Injected**
       {
         headerName: "Injected",
@@ -553,6 +612,7 @@ const CurrentDataGrid = () => {
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
+
       // **TBG** (Tubing Pressure)
       {
         headerName: "TBG",
@@ -561,8 +621,8 @@ const CurrentDataGrid = () => {
         filter: true,
         width: 100,
         cellStyle: {
-          backgroundColor: isDarkMode ? "#424242" : "#FFFFFF", // White for light mode, darker color for dark mode
-          color: isDarkMode ? "#FFFFFF" : "#000000", // Text color for dark mode and light mode
+          backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
+          color: isDarkMode ? "#FFFFFF" : "#000000",
           whiteSpace: "nowrap",
           textOverflow: "ellipsis",
           overflow: "hidden",
@@ -572,6 +632,7 @@ const CurrentDataGrid = () => {
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
+
       // **CSG** (Casing Pressure)
       {
         headerName: "CSG",
@@ -580,8 +641,8 @@ const CurrentDataGrid = () => {
         filter: true,
         width: 100,
         cellStyle: {
-          backgroundColor: isDarkMode ? "#424242" : "#FFFFFF", // White for light mode, darker color for dark mode
-          color: isDarkMode ? "#FFFFFF" : "#000000", // Text color for dark mode and light mode
+          backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
+          color: isDarkMode ? "#FFFFFF" : "#000000",
           whiteSpace: "nowrap",
           textOverflow: "ellipsis",
           overflow: "hidden",
@@ -591,6 +652,45 @@ const CurrentDataGrid = () => {
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
+
+      // **UIC**
+      {
+        headerName: "UIC",
+        field: "UIC",
+        sortable: true,
+        filter: true,
+        width: 100,
+        cellStyle: {
+          backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
+          color: isDarkMode ? "#FFFFFF" : "#000000",
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          textAlign: "right",
+        },
+        headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+      },
+
+      // **Target**
+      {
+        headerName: "Target",
+        field: "Target",
+        sortable: true,
+        filter: true,
+        width: 100,
+        cellStyle: {
+          backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
+          color: isDarkMode ? "#FFFFFF" : "#000000",
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          textAlign: "right",
+        },
+        headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+        valueFormatter: (params) =>
+          params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
+      },
+
       // **Comment**
       {
         headerName: "Comment",
@@ -615,6 +715,7 @@ const CurrentDataGrid = () => {
         autoHeight: true,
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       },
+
       // **Images**
       {
         headerName: "Images",
@@ -634,6 +735,7 @@ const CurrentDataGrid = () => {
         },
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       },
+
       // **Lease ID**
       {
         headerName: "Lease ID",
@@ -659,6 +761,7 @@ const CurrentDataGrid = () => {
         }),
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       },
+
       // **Pumper ID**
       {
         headerName: "Pumper ID",
@@ -684,6 +787,7 @@ const CurrentDataGrid = () => {
         }),
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       },
+
       // **Chart Button**
       {
         headerName: "Chart",
@@ -723,10 +827,12 @@ const CurrentDataGrid = () => {
             "csg",
             "PriorTbg",
             "PriorCsg",
+            "UIC",
+            "Target",
           ].includes(col.field)
       );
     } else if (wellType === "I") {
-      // **Injection Only:** Include only injection-related columns
+      // **Injection Only:** Include injection-related columns along with UIC and Target
       columns = columns.filter((col) =>
         [
           "PrintLeaseName",
@@ -740,12 +846,17 @@ const CurrentDataGrid = () => {
           "PriorCsg",
           "ImageCount",
           "gaugecomments",
+          "UIC",
+          "Target",
         ].includes(col.field)
       );
     } else {
-      // **Show All:** Exclude 'tbg', 'csg', 'PriorTbg', 'PriorCsg' columns
+      // **Show All:** Exclude 'tbg', 'csg', 'PriorTbg', 'PriorCsg', 'UIC', 'Target' columns
       columns = columns.filter(
-        (col) => !["tbg", "csg", "PriorTbg", "PriorCsg"].includes(col.field)
+        (col) =>
+          !["tbg", "csg", "PriorTbg", "PriorCsg", "UIC", "Target"].includes(
+            col.field
+          )
       );
     }
 
@@ -792,7 +903,7 @@ const CurrentDataGrid = () => {
     // Create a download link and trigger the download
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `export_${currentDate}.csv`;
+    link.download = `CurrentProd_${currentDate}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -938,7 +1049,6 @@ const CurrentDataGrid = () => {
         handleExport={handleExport}
         handlePrint={handlePrint}
       />
-
       {loading ? (
         <GridLoader isDarkMode={isDarkMode} rows={50} columns={10} />
       ) : error ? (
