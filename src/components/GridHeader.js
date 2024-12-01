@@ -194,10 +194,14 @@ const Header = ({
         >
           <option value="P">Production</option>
           <option value="Y">Yearly Production</option>
-          <option value="T">Gauges by Tank</option>
+          <option value="T">Gauge Sheet</option>
           <option value="O">Gauges OH Bbls</option>
           <option value="W">Wells On/Off</option>
           <option value="WE">Well Tests</option>
+          <option value="R">Run Tickets Export</option>
+          <option value="G">Gauges Export</option>
+          <option value="A">API Daily Production</option>
+          <option value="AM">API Monthly Production</option>
         </select>
       )}
 

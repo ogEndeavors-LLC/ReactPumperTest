@@ -346,7 +346,7 @@ const CloseIcon = styled.div`
 function Layout({ children }) {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const { userRole, userID, setUser } = useUser();
+  const { userRole, userID, setUser, companyName } = useUser();
   const [spinning, setSpinning] = useState(false);
   const [profileCardVisible, setProfileCardVisible] = useState(false);
 
@@ -405,8 +405,13 @@ function Layout({ children }) {
       <NavBarContainer style={navBarAnimation} theme={theme}>
         <Logo onClick={() => navigate("/home")} theme={theme}>
           <HomeIcon className="material-icon" />
-          <span>ogPumper</span>
-        </Logo>
+          <span>
+            {" "}
+            {companyName && companyName.length > 3
+              ? companyName
+              : "ogFieldTicket"}
+          </span>
+        </Logo>{" "}
         <NavItems>
           {userRole !== "P" && (
             <AdminButton theme={theme} onClick={() => navigate("/admin-panel")}>

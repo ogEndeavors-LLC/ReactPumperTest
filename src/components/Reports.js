@@ -12,16 +12,18 @@ const ReportPage = () => {
   // Retrieve the current theme (light or dark)
   const { theme = "light" } = useTheme() || {};
   const isDarkMode = theme === "dark";
-  const [currentDate, setCurrentDate] = useState(moment().format("YYYY-MM-DD"));
 
   // State variables
+  const [currentDate, setCurrentDate] = useState(moment().format("YYYY-MM-DD"));
+  const [useColorCut, setUseColorCut] = useState("Y"); // Initialize with default "Y"
   const [reportFrom, setReportFrom] = useState(
     moment().startOf("year").format("YYYY-MM-DD")
   );
   const [reportThru, setReportThru] = useState(
     moment().endOf("year").format("YYYY-MM-DD")
   );
-  const [selectedReport, setSelectedReport] = useState("P"); // Default to '' for default report
+  const [quickLink, setQuickLink] = useState("custom"); // Add quickLink state
+  const [selectedReport, setSelectedReport] = useState("P"); // Default to 'P' for default report
   const [leaseID, setLeaseID] = useState("");
   const [leases, setLeases] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -46,6 +48,7 @@ const ReportPage = () => {
   const [wellType, setWellType] = useState("ALL");
   const [useLinePressure, setUseLinePressure] = useState("Y");
 
+  // Load URL parameters on component mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -72,12 +75,28 @@ const ReportPage = () => {
 
     setIsParamsLoaded(true); // Indicate that the URL params have been loaded
   }, []);
-  // Fetch leases on component mount
+
+  // Fetch leases and client settings after URL parameters are loaded
   useEffect(() => {
     if (isParamsLoaded) {
       fetchLeases();
+      fetchClientSettings();
     }
   }, [isParamsLoaded, selectedReport]);
+
+  // Fetch client settings to get 'useColorCut' value
+  const fetchClientSettings = async () => {
+    try {
+      const response = await fetch(`${baseUrl}/api/ClientDetails.php`);
+      const data = await response.json();
+      if (data && data.length > 0) {
+        const clientSettings = data[0];
+        setUseColorCut(clientSettings.UseColorCut || "N");
+      }
+    } catch (error) {
+      console.error("Error fetching client settings:", error);
+    }
+  };
 
   // Update lease settings when leaseID changes
   useEffect(() => {
@@ -117,54 +136,53 @@ const ReportPage = () => {
   const fetchLeases = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${baseUrl}/api/leases.php`);
+      const response = await fetch(`${baseUrl}/api/leases.php?includeTanks=1`);
       const data = await response.json();
+
+      const allOption = {
+        LeaseID: "~ALL~",
+        LeaseName: "All Leases",
+        Tanks: [],
+      };
+      const leasesWithAll = [...data, allOption];
+      setLeases(leasesWithAll);
 
       // Get LeaseID from URL params (if available)
       const params = new URLSearchParams(window.location.search);
       const leaseIdFromUrl = params.get("LeaseID");
 
-      // If selectedReport is "O", include "All" option
-      if (selectedReport === "O") {
-        const allOption = { LeaseID: "All", LeaseName: "ALL" };
-        const leasesWithAll = [allOption, ...data];
-        setLeases(leasesWithAll);
-
-        // If a LeaseID is provided via URL, use that, otherwise default to "All"
-        if (leaseIdFromUrl) {
-          const leaseFromUrl = leasesWithAll.find(
-            (lease) => lease.LeaseID === leaseIdFromUrl
-          );
-          if (leaseFromUrl) {
-            setLeaseID(leaseFromUrl.LeaseID);
-            setLeaseSettings(leaseFromUrl);
-          } else {
-            setLeaseID("All"); // Default to "All" if LeaseID from URL is not found
-            setLeaseSettings(leasesWithAll[1]); // Assuming the first lease is valid for initial settings
-          }
-        } else {
-          setLeaseID("All"); // Default to "All" if no LeaseID in URL
-          setLeaseSettings(leasesWithAll[1]); // Assuming the first lease is valid for initial settings
+      // Set default LeaseID if not already set
+      if (leaseIdFromUrl) {
+        // Use LeaseID from URL parameters
+        setLeaseID(leaseIdFromUrl);
+        const leaseFromUrl = leasesWithAll.find(
+          (lease) => lease.LeaseID === leaseIdFromUrl
+        );
+        if (leaseFromUrl) {
+          setLeaseSettings(leaseFromUrl);
+        } else if (leasesWithAll.length > 0) {
+          // If LeaseID from URL is not found, default to first real lease
+          setLeaseID(leasesWithAll[0].LeaseID);
+          setLeaseSettings(leasesWithAll[0]);
         }
+      } else if (leasesWithAll.length > 0) {
+        // No LeaseID in URL, default to first real lease
+        setLeaseID(leasesWithAll[0].LeaseID);
+        setLeaseSettings(leasesWithAll[0]);
       } else {
-        // For other reports
-        setLeases(data);
+        // No leases available, default to '~ALL~'
+        setLeaseID("~ALL~");
+        setLeaseSettings(allOption);
+      }
 
-        // If a LeaseID is provided via URL, use that, otherwise default to the first lease
-        if (leaseIdFromUrl) {
-          const leaseFromUrl = data.find(
-            (lease) => lease.LeaseID === leaseIdFromUrl
-          );
-          if (leaseFromUrl) {
-            setLeaseID(leaseFromUrl.LeaseID);
-            setLeaseSettings(leaseFromUrl);
-          } else if (data.length > 0) {
-            setLeaseID(data[0].LeaseID); // Default to the first lease in the list if LeaseID from URL is not found
-            setLeaseSettings(data[0]);
-          }
-        } else if (data.length > 0) {
-          setLeaseID(data[0].LeaseID || ""); // Default to the first lease if no LeaseID in URL
-          setLeaseSettings(data[0]);
+      // If a LeaseID is provided via URL, use that
+      if (leaseIdFromUrl) {
+        setLeaseID(leaseIdFromUrl);
+        const leaseFromUrl = leasesWithAll.find(
+          (lease) => lease.LeaseID === leaseIdFromUrl
+        );
+        if (leaseFromUrl) {
+          setLeaseSettings(leaseFromUrl);
         }
       }
     } catch (error) {
@@ -190,6 +208,132 @@ const ReportPage = () => {
     setShowGas(leaseData.ShowGas || "N");
     setWellType(leaseData.WellType || "ALL");
     setUseLinePressure(leaseData.useLinePressure || "N");
+  };
+
+  // Function to update URL parameters
+  const updateURLParams = (param, value) => {
+    const url = new URL(window.location);
+    url.searchParams.set(param, value);
+    window.history.pushState({}, "", url);
+  };
+
+  // Handlers for input changes and actions
+  const handleReportFromChange = (e) => {
+    const newFromDate = e.target.value;
+    setReportFrom(newFromDate);
+    updateURLParams("StartDate", newFromDate);
+    setQuickLink("custom"); // Reset quick link to custom when date changes
+  };
+
+  const handleReportThruChange = (e) => {
+    const newThruDate = e.target.value;
+    setReportThru(newThruDate);
+    updateURLParams("Thru", newThruDate);
+    setQuickLink("custom"); // Reset quick link to custom when date changes
+  };
+
+  const formatValueWithDefaultDot = (params) =>
+    params.value !== null && !isNaN(params.value)
+      ? parseFloat(params.value).toFixed(2)
+      : ".";
+
+  const formatValueWithDefaultZero = (params) =>
+    params.value !== null && !isNaN(params.value)
+      ? parseFloat(params.value).toFixed(2)
+      : "0";
+
+  const handleQuickLinkChange = (e) => {
+    const qd = e.target.value;
+    setQuickLink(qd);
+    if (qd === "custom") {
+      // Do nothing, user will set reportFrom and reportThru manually
+      return;
+    }
+    let newReportFrom, newReportThru;
+    const today = moment();
+
+    switch (qd) {
+      case "CM":
+        newReportFrom = today.clone().startOf("month").format("YYYY-MM-DD");
+        newReportThru = today.clone().endOf("month").format("YYYY-MM-DD");
+        break;
+      case "3D":
+        newReportFrom = today.clone().subtract(2, "days").format("YYYY-MM-DD");
+        newReportThru = today.clone().format("YYYY-MM-DD");
+        break;
+      case "7D":
+        newReportFrom = today.clone().subtract(6, "days").format("YYYY-MM-DD");
+        newReportThru = today.clone().format("YYYY-MM-DD");
+        break;
+      case "30":
+        newReportFrom = today.clone().subtract(29, "days").format("YYYY-MM-DD");
+        newReportThru = today.clone().format("YYYY-MM-DD");
+        break;
+      case "LM":
+        newReportFrom = today
+          .clone()
+          .subtract(1, "month")
+          .startOf("month")
+          .format("YYYY-MM-DD");
+        newReportThru = today
+          .clone()
+          .subtract(1, "month")
+          .endOf("month")
+          .format("YYYY-MM-DD");
+        break;
+      case "3M":
+        newReportFrom = today
+          .clone()
+          .subtract(3, "months")
+          .add(1, "day")
+          .format("YYYY-MM-DD");
+        newReportThru = today.clone().format("YYYY-MM-DD");
+        break;
+      case "6M":
+        newReportFrom = today
+          .clone()
+          .subtract(6, "months")
+          .add(1, "day")
+          .format("YYYY-MM-DD");
+        newReportThru = today.clone().format("YYYY-MM-DD");
+        break;
+      case "CY":
+        newReportFrom = today.clone().startOf("year").format("YYYY-MM-DD");
+        newReportThru = today.clone().format("YYYY-MM-DD");
+        break;
+      case "LY":
+        newReportFrom = today
+          .clone()
+          .subtract(1, "year")
+          .startOf("year")
+          .format("YYYY-MM-DD");
+        newReportThru = today
+          .clone()
+          .subtract(1, "year")
+          .endOf("year")
+          .format("YYYY-MM-DD");
+        break;
+      default:
+        return;
+    }
+
+    setReportFrom(newReportFrom);
+    setReportThru(newReportThru);
+    updateURLParams("StartDate", newReportFrom);
+    updateURLParams("Thru", newReportThru);
+  };
+
+  const handleReportTypeChange = (e) => {
+    setLoading(true);
+    setSelectedReport(e.target.value);
+    updateURLParams("Rpt", e.target.value); // Update URL params if needed
+    setLoading(false);
+  };
+
+  const handleLeaseChange = (e) => {
+    setLoading(true);
+    setLeaseID(e.target.value);
+    setLoading(false);
   };
 
   // Function to fetch data based on selected options
@@ -222,7 +366,7 @@ const ReportPage = () => {
 
         setRowData(formattedData);
 
-        calculateTotalsForGaugesByTank(formattedData); // Call the new totals function
+        calculateTotalsForGaugesByTank(formattedData, selectedReport);
       } else if (selectedReport === "Y") {
         // Yearly Production Report
         apiUrl = `${baseUrl}/service_testprod.php`;
@@ -246,11 +390,57 @@ const ReportPage = () => {
         );
         setRowData(formattedData);
         calculateYearlyTotal(formattedData);
+      } else if (selectedReport === "G") {
+        // Export Report
+        apiUrl = `${baseUrl}/service_gauges_export.php`;
+
+        apiParams.append("LeaseID", leaseID || "~ALL~");
+        apiParams.append("WellID", "undefined"); // Adjust if necessary
+        if (reportFrom) apiParams.append("FromDate", reportFrom);
+        if (reportThru) apiParams.append("ThruDate", reportThru);
+
+        apiUrl += `?${apiParams.toString()}`;
+
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        // Process data to match the PHP logic
+        const formattedData = data.map((item) => {
+          const gaugeFt = parseFloat(item.GaugeFt) || 0;
+          const gaugeIn = parseFloat(item.GaugeIn) || 0;
+          const colorCutFt = parseFloat(item.ColorCutFt) || 0;
+          const colorCutIn = parseFloat(item.ColorCutIn) || 0;
+
+          const totalFluidInches = gaugeFt * 12 + gaugeIn;
+          const totalColorCutInches = colorCutFt * 12 + colorCutIn;
+          const totalOilInches = totalFluidInches - totalColorCutInches;
+          const totalOilFt = Math.floor(totalOilInches / 12);
+          const totalOilIn = (totalOilInches / 12 - totalOilFt) * 12;
+
+          const ticketDate = item.GaugeDate;
+          const prodDate = moment(ticketDate).format("MM/DD/YYYY");
+
+          return {
+            ticketDate: ticketDate,
+            leaseID: item.LeaseID,
+            leaseName: item.LeaseName,
+            tankID: item.TankID,
+            gaugeFeet: totalOilFt,
+            gaugeInches: totalOilIn.toFixed(2),
+            leaseNum: item.PropertyNum,
+            tankOrMeterNumber: item.WPTankNum,
+            productCode: "OIL",
+            productionDate: prodDate,
+            // Include any additional fields if necessary
+          };
+        });
+
+        setRowData(formattedData);
       } else if (selectedReport === "O") {
-        // New Gauges OH BBLs report logic
+        // Gauges OH BBLs Report
         apiUrl = `${baseUrl}/service_gauges_oh.php`;
 
-        if (leaseID === "All") {
+        if (leaseID === "~ALL~") {
           apiParams.append("LeaseID", "");
         } else {
           apiParams.append("LeaseID", leaseID);
@@ -268,17 +458,151 @@ const ReportPage = () => {
         const formattedData = data.map((item) => ({
           LeaseID: item.LeaseID,
           LeaseName: item.LeaseName,
+          GaugeDate: moment(item.GaugeDate).format("MM/DD/YYYY"),
           TankID: item.TankID,
-          Size: `${item.Size} bbls/in`,
+          Size: `${item.Size} `,
           Gauge: `${item.GaugeFt}' ${item.GaugeIn}"`,
           BblsOH: parseFloat(item.BblsOH).toFixed(2),
           PendingLoads: parseInt(item.NumLoads, 10),
           Gauged: parseFloat(item.BblsOH).toFixed(2), // Assuming Gauged is same as BblsOH
-          // Add other fields if necessary
+          // Include ColorCutFt and ColorCutIn if useColorCut is "Y"
+          ...(useColorCut === "Y" && {
+            ColorCut: `${item.ColorCutFt}' ${item.ColorCutIn}"`,
+          }),
+        }));
+
+        calculateTotalsForGaugesByTank(formattedData, selectedReport);
+
+        setRowData(formattedData);
+      } else if (selectedReport === "R") {
+        // Run Tickets Report
+        apiUrl = `${baseUrl}/service_runtickets.php`;
+
+        apiParams.append("LeaseID", leaseID || "~ALL~");
+        apiParams.append("WellID", "undefined"); // Adjust if necessary
+        if (reportFrom) apiParams.append("From", reportFrom);
+        if (reportThru) apiParams.append("Thru", reportThru);
+
+        apiUrl += `?${apiParams.toString()}`;
+
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        const formattedData = await Promise.all(
+          data.map(async (row) => {
+            let bbls = 0;
+
+            if (row.Override === "Y") {
+              bbls = parseFloat(row.OverrideBbls) || 0;
+              // Set opening and closing fields to empty strings
+              row.OpeningFeet = "";
+              row.OpeningInches = "";
+              row.ClosingFeet = "";
+              row.ClosingInches = "";
+            } else {
+              // Get lease data from leases array
+              const dataLease = leases.find(
+                (lease) => lease.LeaseID === row.LeaseID
+              );
+
+              if (!dataLease) {
+                console.warn(
+                  `Lease ID ${row.LeaseID} not found in leases array.`
+                );
+                // Handle missing lease data
+              }
+
+              const tankid = row.TankOrMeterNumber;
+              const tanks = dataLease?.Tanks || [];
+              const tank = tanks.find((t) => t.TankID == tankid);
+
+              if (tank) {
+                const TankBblsPerInch = parseFloat(tank.BBLSperInch) || 0;
+                const openFeet = parseFloat(row.OpeningFeet) || 0;
+                const openInches = parseFloat(row.OpeningInches) || 0;
+                const closeFeet = parseFloat(row.ClosingFeet) || 0;
+                const closeInches = parseFloat(row.ClosingInches) || 0;
+
+                const openbbls = (openFeet * 12 + openInches) * TankBblsPerInch;
+                const closebbls =
+                  (closeFeet * 12 + closeInches) * TankBblsPerInch;
+                bbls = -(closebbls - openbbls);
+              } else {
+                console.warn(
+                  `Tank ID ${tankid} not found for Lease ID ${row.LeaseID}`
+                );
+                bbls = 0;
+              }
+            }
+
+            // Get LeaseName from leases array
+            const leaseInfo = leases.find(
+              (lease) => lease.LeaseID === row.LeaseID
+            );
+            const LeaseName = leaseInfo ? leaseInfo.LeaseName : row.LeaseID;
+
+            return {
+              ...row,
+              bbls: bbls.toFixed(2),
+              TicketDate: row.TicketDate
+                ? moment(row.TicketDate, "YYYY-MM-DD").format("MM/DD/YYYY")
+                : "",
+              TicketTime: moment(row.TicketTime, "HH:mm:ss").format("HH:mm"),
+              LeaseName: LeaseName,
+              // Format other fields if necessary
+            };
+          })
+        );
+
+        setRowData(formattedData);
+        setPinnedTopRowData([]); // Ensure no totals row is set
+      } else if (selectedReport === "A") {
+        apiUrl = `${baseUrl}/service_testcurrent.php`;
+
+        // Prepare API parameters
+        const apiParams = new URLSearchParams();
+        if (leaseID) apiParams.append("LeaseID", leaseID);
+        if (reportFrom) apiParams.append("From", reportFrom);
+        if (reportThru) apiParams.append("Thru", reportThru);
+
+        apiUrl += `?${apiParams.toString()}`;
+
+        // Fetch and process data
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        const formattedData = data.map((item) => ({
+          ...item,
+          GaugeDate: item.GaugeDate
+            ? moment(item.GaugeDate).format("MM/DD/YYYY")
+            : null,
         }));
 
         setRowData(formattedData);
-      } else if (selectedReport === "P") {
+      } else if (selectedReport === "AM") {
+        apiUrl = `${baseUrl}/service_testcurrent.php`;
+
+        // Prepare API parameters
+        const apiParams = new URLSearchParams();
+        if (leaseID) apiParams.append("LeaseID", leaseID);
+        if (reportFrom) apiParams.append("From", reportFrom);
+        if (reportThru) apiParams.append("Thru", reportThru);
+
+        apiUrl += `?${apiParams.toString()}`;
+
+        // Fetch and process data
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        const formattedData = data.map((item) => ({
+          ...item,
+          GaugeDate: item.GaugeDate
+            ? moment(item.GaugeDate).format("MM/DD/YYYY")
+            : null,
+        }));
+
+        setRowData(formattedData);
+      } else {
         // Default or other reports
         apiUrl = `${baseUrl}/service_testprod.php`;
 
@@ -328,12 +652,12 @@ const ReportPage = () => {
   };
 
   // Function to calculate totals for the Gauges By Tank report
-  const calculateTotalsForGaugesByTank = (data) => {
+  const calculateTotalsForGaugesByTank = (data, selectedReport) => {
     const totals = data.reduce(
       (acc, curr) => {
         return {
-          GaugeDate: "Totals",
-          gaugedbbls: acc.gaugedbbls + (parseFloat(curr.gaugedbbls) || 0),
+          GaugeDate: selectedReport === "T" ? "Totals" : "",
+          produced: acc.produced + (parseFloat(curr.produced) || 0),
           runbbls: acc.runbbls + (parseFloat(curr.runbbls) || 0),
           drawbbls: acc.drawbbls + (parseFloat(curr.drawbbls) || 0),
           WMeter: acc.WMeter + (parseFloat(curr.WMeter) || 0),
@@ -347,7 +671,7 @@ const ReportPage = () => {
       },
       {
         GaugeDate: "",
-        gaugedbbls: 0,
+        produced: 0,
         runbbls: 0,
         drawbbls: 0,
         WMeter: 0,
@@ -532,7 +856,11 @@ const ReportPage = () => {
   const columnDefs = useMemo(() => {
     const columns = [];
 
-    // Common columns
+    // Common variables
+    const showOilY = showOil === "Y";
+    const showWaterY = showWater === "Y";
+    const showGasY = showGas === "Y";
+
     if (selectedReport === "Y") {
       // Yearly Production Report Columns
       columns.push({
@@ -541,11 +869,10 @@ const ReportPage = () => {
         sortable: true,
         filter: true,
         cellStyle: { textAlign: "center" },
-        minWidth: 110,
-        flex: 1,
+        width: 100,
       });
 
-      if (showOil === "Y") {
+      if (showOilY) {
         columns.push(
           {
             headerName: "BOM On Hand",
@@ -554,8 +881,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: oilCellStyle,
-            minWidth: 120,
-            flex: 1,
+            width: 120,
           },
           {
             headerName: "Production",
@@ -564,8 +890,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: oilCellStyle,
-            minWidth: 100,
-            flex: 1,
+            width: 100,
           },
           {
             headerName: "Disposition",
@@ -574,13 +899,12 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: oilCellStyle,
-            minWidth: 100,
-            flex: 1,
+            width: 100,
           }
         );
       }
 
-      if (showWater === "Y") {
+      if (showWaterY) {
         if (wellType === "INJ") {
           columns.push({
             headerName: "Injected",
@@ -589,8 +913,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: waterCellStyle,
-            minWidth: 100,
-            flex: 1,
+            width: 100,
           });
         } else {
           columns.push({
@@ -600,8 +923,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: waterCellStyle,
-            minWidth: 100,
-            flex: 1,
+            width: 100,
           });
         }
       }
@@ -615,8 +937,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: { textAlign: "right" },
-            minWidth: 130,
-            flex: 1,
+            width: 130,
           },
           {
             headerName: "Max Tbg Pressure",
@@ -625,13 +946,12 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: { textAlign: "right" },
-            minWidth: 130,
-            flex: 1,
+            width: 130,
           }
         );
       }
 
-      if (showGas === "Y") {
+      if (showGasY) {
         columns.push({
           headerName: "Mcf",
           field: "SumGas",
@@ -639,10 +959,235 @@ const ReportPage = () => {
           filter: true,
           valueFormatter: formatValue,
           cellStyle: gasCellStyle,
-          minWidth: 80,
-          flex: 1,
+          width: 80,
         });
       }
+    } else if (selectedReport === "A") {
+      columns.push(
+        {
+          headerName: "LeaseName",
+          field: "LeaseName",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "left" },
+          width: 150,
+        },
+        {
+          headerName: "API",
+          field: "API",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 100,
+        },
+        {
+          headerName: "Date",
+          field: "gaugedate",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 100,
+        },
+        {
+          headerName: "Gas",
+          field: "Gas",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValueWithDefaultZero,
+          cellStyle: gasCellStyle,
+          width: 80,
+        },
+        {
+          headerName: "Oil",
+          field: "Produced",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValueWithDefaultZero,
+          cellStyle: oilCellStyle,
+          width: 100,
+        },
+        {
+          headerName: "Water",
+          field: "Water",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValueWithDefaultZero,
+          cellStyle: waterCellStyle,
+          width: 100,
+        },
+        {
+          headerName: "Feet Above Pump",
+          field: "Static",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValueWithDefaultDot,
+          cellStyle: { textAlign: "right" },
+          width: 120,
+        }
+      );
+    } else if (selectedReport === "AM") {
+      columns.push(
+        {
+          headerName: "LeaseName",
+          field: "LeaseName",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "left" },
+          width: 150,
+        },
+        {
+          headerName: "API",
+          field: "API",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 100,
+        },
+        {
+          headerName: "Date",
+          field: "gaugedate",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 100,
+        },
+
+        {
+          headerName: "DaysOn",
+          field: "Produced",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValueWithDefaultZero,
+          cellStyle: oilCellStyle,
+          width: 100,
+        },
+        {
+          headerName: "Gas",
+          field: "Gas",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValueWithDefaultZero,
+          cellStyle: gasCellStyle,
+          width: 80,
+        },
+        {
+          headerName: "Oil",
+          field: "Produced",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValueWithDefaultZero,
+          cellStyle: oilCellStyle,
+          width: 100,
+        },
+        {
+          headerName: "Water",
+          field: "Water",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValueWithDefaultZero,
+          cellStyle: waterCellStyle,
+          width: 100,
+        },
+        {
+          headerName: "Feet Above Pump",
+          field: "Static",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValueWithDefaultDot,
+          cellStyle: { textAlign: "right" },
+          width: 120,
+        }
+      );
+    } else if (selectedReport === "G") {
+      // Export Report Columns
+      return [
+        {
+          headerName: "Ticket Date",
+          field: "ticketDate",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 120,
+          valueFormatter: (params) =>
+            moment(params.value).isValid()
+              ? moment(params.value).format("MM/DD/YYYY")
+              : "",
+        },
+        {
+          headerName: "Lease ID",
+          field: "leaseID",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 100,
+        },
+        {
+          headerName: "Lease Name",
+          field: "leaseName",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "left" },
+          width: 150,
+        },
+        {
+          headerName: "Tank ID",
+          field: "tankID",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 100,
+        },
+        {
+          headerName: "Gauge Feet",
+          field: "gaugeFeet",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValue,
+          cellStyle: { textAlign: "right" },
+          width: 100,
+        },
+        {
+          headerName: "Gauge Inches",
+          field: "gaugeInches",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValue,
+          cellStyle: { textAlign: "right" },
+          width: 110,
+        },
+        {
+          headerName: "Lease Num",
+          field: "leaseNum",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 100,
+        },
+        {
+          headerName: "Tank/Meter Number",
+          field: "tankOrMeterNumber",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 130,
+        },
+        {
+          headerName: "Product Code",
+          field: "productCode",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 110,
+        },
+        {
+          headerName: "Production Date",
+          field: "productionDate",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 120,
+        },
+      ];
     } else if (selectedReport === "T") {
       // Gauges By Tank Report Columns
       columns.push(
@@ -652,8 +1197,11 @@ const ReportPage = () => {
           sortable: true,
           filter: true,
           cellStyle: { textAlign: "center" },
-          minWidth: 90,
-          flex: 1,
+          width: 140,
+          valueFormatter: (params) => {
+            if (params.value === "Totals") return "Totals";
+            return moment(params.value, "MM/DD/YYYY").format("MM/DD/YYYY");
+          },
         },
         {
           headerName: "Time",
@@ -661,16 +1209,10 @@ const ReportPage = () => {
           sortable: true,
           filter: true,
           cellStyle: { textAlign: "center" },
-          minWidth: 70,
-          flex: 1,
+          width: 90,
         }
       );
 
-      const showOilY = showOil === "Y";
-      const showWaterY = showWater === "Y";
-      const showGasY = showGas === "Y";
-
-      // Handle different combinations of showOil, showWater, and showGas
       if (showOilY) {
         columns.push(
           {
@@ -679,8 +1221,7 @@ const ReportPage = () => {
             sortable: true,
             filter: true,
             cellStyle: { textAlign: "center" },
-            minWidth: 100,
-            flex: 1,
+            width: 100,
             cellRenderer: (params) => {
               const value = params.value
                 ? params.value.trim().toUpperCase()
@@ -694,10 +1235,10 @@ const ReportPage = () => {
             headerName: "Tank",
             field: "TankID",
             sortable: true,
+            sort: "asc",
             filter: true,
             cellStyle: { textAlign: "center" },
-            minWidth: 80,
-            flex: 1,
+            width: 110,
           },
           {
             headerName: "Gauge",
@@ -705,18 +1246,16 @@ const ReportPage = () => {
             sortable: true,
             filter: true,
             cellStyle: oilCellStyle,
-            minWidth: 100,
-            flex: 1,
+            width: 100,
           },
           {
             headerName: "Gross Bbls",
-            field: "gaugedbbls",
+            field: "produced",
             sortable: true,
             filter: true,
             valueFormatter: formatValue,
             cellStyle: oilCellStyle,
-            minWidth: 100,
-            flex: 1,
+            width: 100,
           },
           {
             headerName: "Run Bbls",
@@ -725,8 +1264,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: oilCellStyle,
-            minWidth: 100,
-            flex: 1,
+            width: 100,
           },
           {
             headerName: "BS&W Draws",
@@ -735,8 +1273,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: oilCellStyle,
-            minWidth: 110,
-            flex: 1,
+            width: 110,
           }
         );
       }
@@ -750,21 +1287,27 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: waterCellStyle,
-            minWidth: 130,
-            flex: 1,
+            width: 130,
           });
         } else {
-          columns.push(
-            {
+          // Initialize an array to hold water-related columns
+          const waterColumns = [];
+
+          // Conditionally add the "Water Meter" column
+          if (hasWaterMeter === "Y") {
+            waterColumns.push({
               headerName: "Water Meter",
               field: "WMeter",
               sortable: true,
               filter: true,
               valueFormatter: formatValue,
               cellStyle: waterCellStyle,
-              minWidth: 110,
-              flex: 1,
-            },
+              width: 110,
+            });
+          }
+
+          // Add the remaining water columns
+          waterColumns.push(
             {
               headerName: "Water Bbls Gauged",
               field: "waterproducedtankbbls",
@@ -772,8 +1315,7 @@ const ReportPage = () => {
               filter: true,
               valueFormatter: formatValue,
               cellStyle: waterCellStyle,
-              minWidth: 150,
-              flex: 1,
+              width: 150,
             },
             {
               headerName: "Net Water",
@@ -782,8 +1324,7 @@ const ReportPage = () => {
               filter: true,
               valueFormatter: formatValue,
               cellStyle: waterCellStyle,
-              minWidth: 100,
-              flex: 1,
+              width: 100,
             },
             {
               headerName: "Water Hauled",
@@ -792,10 +1333,12 @@ const ReportPage = () => {
               filter: true,
               valueFormatter: formatValue,
               cellStyle: waterCellStyle,
-              minWidth: 120,
-              flex: 1,
+              width: 120,
             }
           );
+
+          // Push the water columns to the main columns array
+          columns.push(...waterColumns);
         }
       }
 
@@ -807,8 +1350,7 @@ const ReportPage = () => {
           filter: true,
           valueFormatter: formatValue,
           cellStyle: gasCellStyle,
-          minWidth: 80,
-          flex: 1,
+          width: 80,
         });
       }
 
@@ -819,8 +1361,7 @@ const ReportPage = () => {
         sortable: true,
         filter: true,
         cellStyle: { textAlign: "left" },
-        minWidth: 150,
-        flex: 1,
+        width: 150,
       });
 
       // Tbg and Csg
@@ -832,8 +1373,7 @@ const ReportPage = () => {
           filter: true,
           valueFormatter: formatValue,
           cellStyle: { textAlign: "right" },
-          minWidth: 80,
-          flex: 1,
+          width: 80,
         });
       }
       if (showCsg === "Y") {
@@ -844,12 +1384,11 @@ const ReportPage = () => {
           filter: true,
           valueFormatter: formatValue,
           cellStyle: { textAlign: "right" },
-          minWidth: 80,
-          flex: 1,
+          width: 80,
         });
       }
     } else if (selectedReport === "O") {
-      // New Gauges OH BBLs Report Columns
+      // Gauges OH BBLs Report Columns
       columns.push(
         {
           headerName: "Lease ID",
@@ -857,8 +1396,7 @@ const ReportPage = () => {
           sortable: true,
           filter: true,
           cellStyle: { textAlign: "center" },
-          minWidth: 100,
-          flex: 1,
+          width: 100,
         },
         {
           headerName: "Lease Name",
@@ -866,8 +1404,7 @@ const ReportPage = () => {
           sortable: true,
           filter: true,
           cellStyle: { textAlign: "left" },
-          minWidth: 150,
-          flex: 1,
+          width: 150,
         },
         {
           headerName: "Tank ID",
@@ -875,26 +1412,23 @@ const ReportPage = () => {
           sortable: true,
           filter: true,
           cellStyle: { textAlign: "center" },
-          minWidth: 100,
-          flex: 1,
+          width: 100,
         },
         {
-          headerName: "Size (bbls/in)",
+          headerName: "Size",
           field: "Size",
           sortable: true,
           filter: true,
           cellStyle: { textAlign: "right" },
-          minWidth: 120,
-          flex: 1,
+          width: 120,
         },
         {
           headerName: "Gauge",
           field: "Gauge",
           sortable: true,
           filter: true,
-          cellStyle: oilCellStyle, // Reusing existing style
-          minWidth: 100,
-          flex: 1,
+          cellStyle: oilCellStyle,
+          width: 100,
         },
         {
           headerName: "Bbls OH",
@@ -903,8 +1437,7 @@ const ReportPage = () => {
           filter: true,
           valueFormatter: formatValue,
           cellStyle: oilCellStyle,
-          minWidth: 100,
-          flex: 1,
+          width: 100,
         },
         {
           headerName: "Pending Loads",
@@ -912,18 +1445,170 @@ const ReportPage = () => {
           sortable: true,
           filter: true,
           cellStyle: { textAlign: "right" },
-          minWidth: 130,
-          flex: 1,
+          width: 130,
         },
         {
           headerName: "Gauged",
-          field: "Gauged",
+          field: "GaugeDate",
+          sortable: true,
+          filter: true,
+          valueFormatter: (params) => {
+            if (!params.value) return "";
+            if (selectedReport === "T" && params.value === "Totals") {
+              return "Totals";
+            }
+            const date = moment(params.value, "MM/DD/YYYY");
+            return date.isValid() ? date.format("MM/DD/YY") : "";
+          },
+          cellStyle: oilCellStyle,
+          width: 100,
+        }
+      );
+
+      // Conditionally add the "Color Cut" column based on 'useColorCut'
+      if (useColorCut === "Y") {
+        columns.push({
+          headerName: "Color Cut",
+          field: "ColorCut",
+          sortable: true,
+          filter: true,
+          cellStyle: oilCellStyle,
+          width: 100,
+        });
+      }
+    } else if (selectedReport === "R") {
+      // Run Tickets Report Columns
+      columns.push(
+        {
+          headerName: "Ticket Date",
+          field: "TicketDate",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 100,
+        },
+        {
+          headerName: "Ticket Time",
+          field: "TicketTime",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 90,
+        },
+        {
+          headerName: "Ticket Number",
+          field: "TicketNumber",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 100,
+        },
+        {
+          headerName: "Lease ID",
+          field: "LeaseID",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 100,
+        },
+        {
+          headerName: "Lease Name",
+          field: "LeaseName",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "left" },
+          width: 150,
+        },
+        {
+          headerName: "Tank Number",
+          field: "TankOrMeterNumber",
+          sortable: true,
+          filter: true,
+          cellStyle: { textAlign: "center" },
+          width: 110,
+        }
+      );
+
+      // Add opening and closing measurements if not overridden
+      columns.push(
+        {
+          headerName: "Opening Feet",
+          field: "OpeningFeet",
           sortable: true,
           filter: true,
           valueFormatter: formatValue,
-          cellStyle: oilCellStyle,
-          minWidth: 100,
-          flex: 1,
+          cellStyle: { textAlign: "right" },
+          width: 100,
+        },
+        {
+          headerName: "Opening Inches",
+          field: "OpeningInches",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValue,
+          cellStyle: { textAlign: "right" },
+          width: 110,
+        },
+        {
+          headerName: "Closing Feet",
+          field: "ClosingFeet",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValue,
+          cellStyle: { textAlign: "right" },
+          width: 100,
+        },
+        {
+          headerName: "Closing Inches",
+          field: "ClosingInches",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValue,
+          cellStyle: { textAlign: "right" },
+          width: 110,
+        }
+      );
+
+      // Add remaining fields
+      columns.push(
+        {
+          headerName: "Observed Gravity",
+          field: "ObsGravity",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValue,
+          cellStyle: { textAlign: "right" },
+          width: 120,
+        },
+        {
+          headerName: "Observed Temp",
+          field: "ObsTemp",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValue,
+          cellStyle: { textAlign: "right" },
+          width: 120,
+        },
+        {
+          headerName: "Observed % BS&W",
+          field: "ObsPctBSandW",
+          sortable: true,
+          filter: true,
+          valueFormatter: (params) =>
+            params.value !== undefined && params.value !== ""
+              ? parseFloat(params.value).toFixed(4)
+              : "",
+          cellStyle: { textAlign: "right" },
+          width: 130,
+        },
+        {
+          headerName: "Bbls",
+          field: "bbls",
+          sortable: true,
+          filter: true,
+          valueFormatter: formatValue,
+          cellStyle: { textAlign: "right" },
+          width: 100,
         }
       );
     } else {
@@ -934,16 +1619,14 @@ const ReportPage = () => {
         sortable: true,
         filter: true,
         cellStyle: { textAlign: "center" },
-        minWidth: 110,
-        maxWidth: 120,
-        flex: 1,
+        width: 80,
         valueFormatter: (params) => {
           if (params.value === "Totals") return "Totals";
           return moment(params.value, "MM/DD/YYYY").format("MM/DD/YYYY");
         },
       });
 
-      if (showOil === "Y") {
+      if (showOilY) {
         columns.push(
           {
             headerName: "Gross Bbls",
@@ -952,8 +1635,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: oilCellStyle,
-            minWidth: 100,
-            flex: 1,
+            width: 100,
           },
           {
             headerName: "Run Bbls",
@@ -962,8 +1644,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: oilCellStyle,
-            minWidth: 100,
-            flex: 1,
+            width: 100,
           },
           {
             headerName: "BS&W Draws",
@@ -972,13 +1653,12 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: oilCellStyle,
-            minWidth: 110,
-            flex: 1,
+            width: 110,
           }
         );
       }
 
-      if (showGas === "Y") {
+      if (showGasY) {
         columns.push({
           headerName: "Gas",
           field: "Gas",
@@ -986,12 +1666,11 @@ const ReportPage = () => {
           filter: true,
           valueFormatter: formatValue,
           cellStyle: gasCellStyle,
-          minWidth: 80,
-          flex: 1,
+          width: 80,
         });
       }
 
-      if (showWater === "Y") {
+      if (showWaterY) {
         if (wellType === "INJ") {
           columns.push({
             headerName: "Water Injected",
@@ -1000,8 +1679,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: waterCellStyle,
-            minWidth: 130,
-            flex: 1,
+            width: 130,
           });
         } else {
           columns.push(
@@ -1012,8 +1690,7 @@ const ReportPage = () => {
               filter: true,
               valueFormatter: formatValue,
               cellStyle: waterCellStyle,
-              minWidth: 100,
-              flex: 1,
+              width: 100,
             },
             {
               headerName: "Water Hauled",
@@ -1022,8 +1699,7 @@ const ReportPage = () => {
               filter: true,
               valueFormatter: formatValue,
               cellStyle: waterCellStyle,
-              minWidth: 120,
-              flex: 1,
+              width: 120,
             }
           );
         }
@@ -1035,8 +1711,7 @@ const ReportPage = () => {
         sortable: true,
         filter: true,
         cellStyle: { textAlign: "left" },
-        minWidth: 150,
-        flex: 1,
+        width: 150,
       });
 
       if (showTbg === "Y") {
@@ -1047,8 +1722,7 @@ const ReportPage = () => {
           filter: true,
           valueFormatter: formatValue,
           cellStyle: { textAlign: "right" },
-          minWidth: 80,
-          flex: 1,
+          width: 80,
         });
       }
 
@@ -1060,13 +1734,12 @@ const ReportPage = () => {
           filter: true,
           valueFormatter: formatValue,
           cellStyle: { textAlign: "right" },
-          minWidth: 80,
-          flex: 1,
+          width: 80,
         });
       }
 
       // Additional gas-related columns
-      if (showGas === "Y") {
+      if (showGasY) {
         if (useLinePressure === "Y") {
           columns.push({
             headerName: "Flp",
@@ -1075,8 +1748,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: { textAlign: "right" },
-            minWidth: 80,
-            flex: 1,
+            width: 80,
           });
         }
         if (showStatic === "Y") {
@@ -1087,8 +1759,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: { textAlign: "right" },
-            minWidth: 80,
-            flex: 1,
+            width: 80,
           });
         }
         if (showDiff === "Y") {
@@ -1099,8 +1770,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: { textAlign: "right" },
-            minWidth: 80,
-            flex: 1,
+            width: 80,
           });
         }
         if (showFlowRate === "Y") {
@@ -1111,8 +1781,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: { textAlign: "right" },
-            minWidth: 100,
-            flex: 1,
+            width: 100,
           });
         }
         if (showChoke === "Y") {
@@ -1123,8 +1792,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: { textAlign: "right" },
-            minWidth: 80,
-            flex: 1,
+            width: 80,
           });
         }
         if (showMcfAccum === "Y") {
@@ -1135,8 +1803,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: { textAlign: "right" },
-            minWidth: 80,
-            flex: 1,
+            width: 80,
           });
         }
         if (showHoursOn === "Y") {
@@ -1147,8 +1814,7 @@ const ReportPage = () => {
             filter: true,
             valueFormatter: formatValue,
             cellStyle: { textAlign: "right" },
-            minWidth: 90,
-            flex: 1,
+            width: 90,
           });
         }
       }
@@ -1158,8 +1824,7 @@ const ReportPage = () => {
         field: "spcc",
         sortable: true,
         filter: true,
-        minWidth: 80,
-        flex: 1,
+        width: 80,
       });
     }
 
@@ -1179,7 +1844,9 @@ const ReportPage = () => {
     showHoursOn,
     useLinePressure,
     wellType,
-    isDarkMode, // Include isDarkMode in dependencies
+    hasWaterMeter,
+    isDarkMode,
+    useColorCut, // Include 'useColorCut' in dependencies
   ]);
 
   // Default column properties
@@ -1189,7 +1856,6 @@ const ReportPage = () => {
       sortable: true,
       filter: true,
       flex: 1, // Add this line
-
       minWidth: 50,
       wrapHeaderText: true,
       autoHeaderHeight: true,
@@ -1197,63 +1863,66 @@ const ReportPage = () => {
     []
   );
 
-  // Handlers for input changes and actions
-  const handleReportFromChange = (e) => setReportFrom(e.target.value);
-  const handleReportThruChange = (e) => setReportThru(e.target.value);
-  const handleReportTypeChange = (e) => {
-    setLoading(true);
-    if (leaseID === "All") {
-      setLeaseID("");
-    }
-
-    setSelectedReport(e.target.value);
-    setLoading(false);
-  };
-  const handleLeaseChange = (e) => {
-    setLoading(true);
-
-    setLeaseID(e.target.value);
-    setLoading(false);
-  };
-
   const handleExport = () => {
     const csvRows = [];
     const headers = columnDefs.map((col) => col.headerName);
     csvRows.push(headers.join(","));
-    const report =
+
+    // Determine the report name
+    const reportName =
       selectedReport === "P"
         ? "Production"
         : selectedReport === "O"
-        ? "Gauges OH Bbls"
+        ? "GaugesOHBBls"
         : selectedReport === "T"
-        ? "Gauges By Tank"
-        : "Yearly Production";
+        ? "GaugesByTank"
+        : selectedReport === "Y"
+        ? "YearlyProduction"
+        : selectedReport === "R"
+        ? "RunTickets"
+        : "Report";
+
+    // Find the selected lease name
+    const selectedLease = leases.find((lease) => lease.LeaseID === leaseID);
+    const leaseName = selectedLease ? selectedLease.LeaseName : leaseID;
+
+    // Format the date range
+    const dateRange = `${moment(reportFrom).format("MM/DD/YYYY")}-${moment(
+      reportThru
+    ).format("MM/DD/YYYY")}`;
+
+    // Sanitize the file name
+    const sanitizeFileName = (name) => name.replace(/[^a-z0-9_-]/gi, "_");
+
+    const fileName = `${sanitizeFileName(reportName)}_${sanitizeFileName(
+      leaseName
+    )}_${dateRange}.csv`;
 
     rowData.forEach((row) => {
       const values = columnDefs.map((col) => {
         let cellValue = row[col.field];
 
-        // Escape and wrap other cell values
+        // Escape and wrap cell values
         if (cellValue !== null && cellValue !== undefined) {
-          // Convert cell value to string and escape double quotes
           cellValue = String(cellValue).replace(/"/g, '""');
         } else {
           cellValue = "";
         }
 
-        // Wrap the cell value in double quotes
         return `"${cellValue}"`;
       });
       csvRows.push(values.join(","));
     });
 
     const csvContent = csvRows.join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
 
     // Create a download link and trigger the download
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `${report}_${currentDate}.csv`;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1266,17 +1935,19 @@ const ReportPage = () => {
       return;
     }
 
-    const printWindow = window.open("", "_blank");
-
-    // Ensure columnDefs exists and filter out Chart column
-    const printColumns = (columnDefs || []).filter(
+    // Ensure columnDefs exists and filter out columns not needed in print
+    let printColumns = (columnDefs || []).filter(
       (col) => col.headerName !== "Chart"
     );
+
+    // Remove the "Type" column from print when "Gauges by Tank" is selected
+    if (selectedReport === "T") {
+      printColumns = printColumns.filter((col) => col.headerName !== "Type");
+    }
 
     // Safety check for printColumns
     if (!printColumns.length) {
       console.error("No columns defined for printing");
-      printWindow.close();
       return;
     }
 
@@ -1294,69 +1965,134 @@ const ReportPage = () => {
       }
     });
 
-    printWindow.document.write(`
+    // Get the report title
+    const reportTitle =
+      selectedReport === "P"
+        ? "Production"
+        : selectedReport === "O"
+        ? "Gauges OH Bbls"
+        : selectedReport === "T"
+        ? "Gauges By Tank"
+        : selectedReport === "Y"
+        ? "Yearly Production"
+        : selectedReport === "R"
+        ? "Run Tickets"
+        : "Report";
+
+    // Find the selected lease name
+    const selectedLease = leases.find((lease) => lease.LeaseID === leaseID);
+    const leaseName = selectedLease ? selectedLease.LeaseName : leaseID;
+
+    // Format reportFrom and reportThru dates
+    const formattedReportFrom = moment(reportFrom).format("MM-DD-YYYY");
+    const formattedReportThru = moment(reportThru).format("MM-DD-YYYY");
+
+    // Build the table headers and set column widths
+    const colWidths = printColumns.map((col) => {
+      // Set default width or a specific width based on the column
+      let width = 80; // default width in pixels
+
+      // Adjust widths for specific columns if needed
+      if (col.headerName === "Lease Name") width = 100;
+      else if (col.headerName === "Comments") width = 150;
+      else if (col.headerName === "Date") width = 70;
+      else if (col.headerName === "Time") width = 60;
+      else width = 80; // Default width
+
+      return width;
+    });
+
+    // Construct the HTML content
+    const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${
-            selectedReport === "P"
-              ? "Production"
-              : selectedReport === "O"
-              ? "Gauges OH Bbls"
-              : selectedReport === "T"
-              ? "Gauges By Tank"
-              : "Yearly Production"
-          }</title>
+          <title>${reportTitle}</title>
           <style>
             @page {
               size: landscape;
+              margin: 1cm;
             }
             body { 
               font-family: Arial, sans-serif; 
-              font-size: 8px; 
+              font-size: 9px; 
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
+            }
+            header {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            header h1 {
+              font-size: 24px;
+              margin: 0;
+            }
+            header h2 {
+              font-size: 18px;
+              margin: 5px 0;
+            }
+            header p {
+              font-size: 14px;
+              margin: 5px 0;
+            }
+            hr {
+              border: 0;
+              border-top: 2px solid #000;
+              margin: 10px 0;
             }
             table { 
               border-collapse: collapse; 
               width: 100%; 
-              page-break-inside: auto;
+              table-layout: fixed;
             }
-            tr { page-break-inside: avoid; page-break-after: auto; }
             th, td { 
               border: 1px solid #ddd; 
-              padding: 2px; 
+              padding: 4px; 
               text-align: left; 
               overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
             }
-            th { background-color: #f2f2f2; }
+            th { 
+              background-color: #f2f2f2; 
+              white-space: normal; /* Allow wrapping */
+              word-wrap: break-word;
+              word-break: break-word;
+              text-align: center;
+              font-size: 9px;
+              vertical-align: middle;
+            }
+            td {
+              font-size: 9px;
+              white-space: nowrap; /* Keep data in one line */
+            }
             .number { text-align: right; }
             .total-row {
-              font-weight: 900;
+              font-weight: bold;
               background-color: ${
                 isDarkMode ? "#2e7d32" : "#e8f5e9"
               } !important;
               color: ${isDarkMode ? "#FFFFFF" : "#000000"};
-              font-size: 1.2em;
-              border-bottom: 3px solid #000;
+              border-bottom: 2px solid #000;
               text-transform: uppercase;
             }
           </style>
         </head>
         <body>
-          <h1>${
-            selectedReport === "P"
-              ? "Production"
-              : selectedReport === "O"
-              ? "Gauges OH Bbls"
-              : selectedReport === "T"
-              ? "Gauges By Tank"
-              : "Yearly Production"
-          }</h1>
-          <p>Date: ${moment(currentDate).format("MM-DD-YYYY")}</p>
+          <header>
+            <h1>${reportTitle}</h1>
+            ${
+              selectedReport === "T" || selectedReport === "R"
+                ? `<h2>Lease Name: ${leaseName}</h2>`
+                : ""
+            }
+            <p>Date Range: ${formattedReportFrom} - ${formattedReportThru}</p>
+            <hr>
+          </header>
           <table>
+            <colgroup>
+              ${colWidths
+                .map((width) => `<col style="width: ${width}px;">`)
+                .join("")}
+            </colgroup>
             <thead>
               <tr>
                 ${printColumns
@@ -1365,67 +2101,85 @@ const ReportPage = () => {
               </tr>
             </thead>
             <tbody>
-              <tr class="total-row">
-                ${printColumns
-                  .map((col) => {
-                    let cellValue = formattedTotalRow[col.field] ?? "";
+              ${
+                selectedReport !== "R" && pinnedTopRowData.length > 0
+                  ? `<tr class="total-row">
+                  ${printColumns
+                    .map((col) => {
+                      let cellValue = formattedTotalRow[col.field] ?? "";
 
-                    // Special handling for GaugeDate
-                    if (col.field === "GaugeDate") {
-                      cellValue = "Totals";
-                    }
+                      // Special handling for GaugeDate
+                      if (col.field === "GaugeDate") {
+                        cellValue = "Totals";
+                      }
 
-                    // Apply value formatter if exists
-                    if (col.valueFormatter && cellValue !== "") {
-                      cellValue = col.valueFormatter({ value: cellValue });
-                    }
+                      // Apply value formatter if exists
+                      if (col.valueFormatter && cellValue !== "") {
+                        cellValue = col.valueFormatter({ value: cellValue });
+                      }
 
-                    return `<td class="${
-                      col.cellStyle?.textAlign === "right" ? "number" : ""
-                    }">${cellValue}</td>`;
-                  })
-                  .join("")}
-              </tr>
+                      return `<td class="${
+                        col.cellStyle?.textAlign === "right" ? "number" : ""
+                      }">${cellValue}</td>`;
+                    })
+                    .join("")}
+                </tr>`
+                  : ""
+              }
               ${rowData
                 .map(
                   (row) => `
-                  <tr>
-                    ${printColumns
-                      .map((col) => {
-                        let cellValue = row[col.field] ?? "";
+                    <tr>
+                      ${printColumns
+                        .map((col) => {
+                          let cellValue = row[col.field] ?? "";
 
-                        if (col.valueFormatter) {
-                          cellValue = col.valueFormatter({ value: cellValue });
-                        }
+                          if (col.valueFormatter) {
+                            cellValue = col.valueFormatter({
+                              value: cellValue,
+                            });
+                          }
 
-                        if (col.field === "GaugeDate" && cellValue) {
-                          cellValue = moment(cellValue).format("MM-DD-YYYY");
-                        }
+                          if (col.field === "GaugeDate" && cellValue) {
+                            cellValue = moment(cellValue).format("MM-DD-YYYY");
+                          }
 
-                        return `<td class="${
-                          col.cellStyle?.textAlign === "right" ? "number" : ""
-                        }">${cellValue}</td>`;
-                      })
-                      .join("")}
-                  </tr>
-                `
+                          return `<td class="${
+                            col.cellStyle?.textAlign === "right" ? "number" : ""
+                          }">${cellValue}</td>`;
+                        })
+                        .join("")}
+                    </tr>
+                  `
                 )
                 .join("")}
             </tbody>
           </table>
         </body>
       </html>
-    `);
+    `;
 
-    printWindow.document.close();
+    // Create a Blob from the HTML content
+    const blob = new Blob([htmlContent], { type: "text/html" });
 
+    // Create a URL for the Blob
+    const url = URL.createObjectURL(blob);
+
+    // Open the Blob URL in a new window
+    const printWindow = window.open(url, "_blank");
+
+    // Set the window's onload function to print and close the window
     printWindow.onload = function () {
+      printWindow.focus();
       printWindow.print();
       printWindow.onafterprint = function () {
+        // Clean up the Blob URL after printing
+        URL.revokeObjectURL(url);
         printWindow.close();
       };
     };
   };
+
   const onGridReady = (params) => {
     params.api.sizeColumnsToFit();
   };
@@ -1455,6 +2209,8 @@ const ReportPage = () => {
       <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
         <Header
           isDarkMode={isDarkMode}
+          quickLink={quickLink}
+          handleQuickLinkChange={handleQuickLinkChange}
           fromDate={reportFrom}
           handleFromDateChange={handleReportFromChange}
           thruDate={reportThru}
@@ -1483,7 +2239,14 @@ const ReportPage = () => {
             paginationPageSize={50}
             onGridReady={onGridReady}
             onFirstDataRendered={onFirstDataRendered}
-            pinnedTopRowData={pinnedTopRowData}
+            pinnedTopRowData={
+              selectedReport === "R" ||
+              selectedReport === "G" ||
+              selectedReport === "AM" ||
+              selectedReport === "A"
+                ? null
+                : pinnedTopRowData
+            }
             suppressSizeToFit={true}
             getRowStyle={(params) =>
               params.node.rowPinned === "top"
@@ -1496,7 +2259,6 @@ const ReportPage = () => {
                   }
                 : {}
             }
-            // Remove 'suppressColumnVirtualisation' if present unless needed
           />
         </div>
       )}

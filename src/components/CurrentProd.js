@@ -233,10 +233,6 @@ const CurrentDataGrid = () => {
       }
     });
 
-    // Optionally, handle Target differently if needed
-    // For example, if you want to display the average Target:
-    // totals.Target = data.length > 0 ? (totals.Target / data.length).toFixed(2) : "0.00";
-
     setTotalRow(totals);
   };
 
@@ -346,6 +342,58 @@ const CurrentDataGrid = () => {
   };
 
   const columnDefs = useMemo(() => {
+    // Define common cell styles
+    const oilCellStyle = {
+      backgroundColor: isDarkMode ? "#424242" : "#D3D3D3",
+      color: isDarkMode ? "#FFFFFF" : "#000000",
+      fontWeight: "500",
+      whiteSpace: "nowrap",
+      textOverflow: "ellipsis",
+      overflow: "hidden",
+      textAlign: "right",
+    };
+
+    const waterCellStyle = {
+      backgroundColor: isDarkMode ? "#424242" : "#ADD8E6", // Light Blue
+      color: isDarkMode ? "#FFFFFF" : "#000000",
+      fontWeight: "500",
+      whiteSpace: "nowrap",
+      textOverflow: "ellipsis",
+      overflow: "hidden",
+      textAlign: "right",
+    };
+
+    const gasCellStyle = {
+      backgroundColor: isDarkMode ? "#424242" : "#FFFFE0", // Light Yellow
+      color: isDarkMode ? "#FFFFFF" : "#000000",
+      fontWeight: "500",
+      whiteSpace: "nowrap",
+      textOverflow: "ellipsis",
+      overflow: "hidden",
+      textAlign: "right",
+    };
+
+    const injectionCellStyle = {
+      backgroundColor: isDarkMode ? "#424242" : "#E6E6FA", // Lavender
+      color: isDarkMode ? "#FFFFFF" : "#000000",
+      fontWeight: "500",
+      whiteSpace: "nowrap",
+      textOverflow: "ellipsis",
+      overflow: "hidden",
+      textAlign: "right",
+    };
+
+    const defaultCellStyle = {
+      backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
+      color: isDarkMode ? "#FFFFFF" : "#000000",
+      whiteSpace: "nowrap",
+      textOverflow: "ellipsis",
+      overflow: "hidden",
+      textAlign: "right",
+    };
+
+    const priorOpacity = 0.6; // Opacity for prior day columns
+
     const allColumns = [
       // **Location**
       {
@@ -402,13 +450,8 @@ const CurrentDataGrid = () => {
               filter: true,
               width: 120,
               cellStyle: {
-                backgroundColor: isDarkMode ? "#424242" : "#D3D3D3",
-                color: isDarkMode ? "#FFFFFF" : "#000000",
-                fontWeight: "500",
-                whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
-                overflow: "hidden",
-                textAlign: "right",
+                ...oilCellStyle,
+                opacity: priorOpacity,
               },
               headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
               valueFormatter: (params) =>
@@ -424,13 +467,8 @@ const CurrentDataGrid = () => {
               filter: true,
               width: 100,
               cellStyle: {
-                backgroundColor: isDarkMode ? "#424242" : "#FFFFE0",
-                color: isDarkMode ? "#FFFFFF" : "#000000",
-                fontWeight: "500",
-                whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
-                overflow: "hidden",
-                textAlign: "right",
+                ...gasCellStyle,
+                opacity: priorOpacity,
               },
               headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
               valueFormatter: (params) =>
@@ -446,13 +484,24 @@ const CurrentDataGrid = () => {
               filter: true,
               width: 120,
               cellStyle: {
-                backgroundColor: isDarkMode ? "#424242" : "#ADD8E6",
-                color: isDarkMode ? "#FFFFFF" : "#000000",
-                fontWeight: "500",
-                whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
-                overflow: "hidden",
-                textAlign: "right",
+                ...waterCellStyle,
+                opacity: priorOpacity,
+              },
+              headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+              valueFormatter: (params) =>
+                params.value !== null
+                  ? parseFloat(params.value).toFixed(2)
+                  : "0.00",
+            },
+            // **Target**
+            {
+              headerName: "Target",
+              field: "Target",
+              sortable: true,
+              filter: true,
+              width: 100,
+              cellStyle: {
+                ...defaultCellStyle,
               },
               headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
               valueFormatter: (params) =>
@@ -468,13 +517,8 @@ const CurrentDataGrid = () => {
               filter: true,
               width: 120,
               cellStyle: {
-                backgroundColor: isDarkMode ? "#424242" : "#E6E6FA",
-                color: isDarkMode ? "#FFFFFF" : "#000000",
-                fontWeight: "500",
-                whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
-                overflow: "hidden",
-                textAlign: "right",
+                ...injectionCellStyle,
+                opacity: priorOpacity,
               },
               headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
               valueFormatter: (params) =>
@@ -490,13 +534,8 @@ const CurrentDataGrid = () => {
               filter: true,
               width: 100,
               cellStyle: {
-                backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
-                color: isDarkMode ? "#FFFFFF" : "#000000",
-                opacity: 0.6,
-                whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
-                overflow: "hidden",
-                textAlign: "right",
+                ...defaultCellStyle,
+                opacity: priorOpacity,
               },
               headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
               valueFormatter: (params) =>
@@ -512,13 +551,8 @@ const CurrentDataGrid = () => {
               filter: true,
               width: 100,
               cellStyle: {
-                backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
-                color: isDarkMode ? "#FFFFFF" : "#000000",
-                opacity: 0.6,
-                whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
-                overflow: "hidden",
-                textAlign: "right",
+                ...defaultCellStyle,
+                opacity: priorOpacity,
               },
               headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
               valueFormatter: (params) =>
@@ -528,7 +562,6 @@ const CurrentDataGrid = () => {
             },
           ]
         : []),
-
       // **Current Oil**
       {
         headerName: `${moment(currentDate).format("MM/DD")} Current Oil`,
@@ -536,20 +569,11 @@ const CurrentDataGrid = () => {
         sortable: true,
         filter: true,
         width: 120,
-        cellStyle: {
-          backgroundColor: isDarkMode ? "#424242" : "#D3D3D3",
-          color: isDarkMode ? "#FFFFFF" : "#000000",
-          fontWeight: "500",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
-          overflow: "hidden",
-          textAlign: "right",
-        },
+        cellStyle: oilCellStyle,
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
-
       // **Gas**
       {
         headerName: "Gas",
@@ -557,20 +581,11 @@ const CurrentDataGrid = () => {
         sortable: true,
         filter: true,
         width: 100,
-        cellStyle: {
-          backgroundColor: isDarkMode ? "#424242" : "#FFFFE0",
-          color: isDarkMode ? "#FFFFFF" : "#000000",
-          fontWeight: "500",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
-          overflow: "hidden",
-          textAlign: "right",
-        },
+        cellStyle: gasCellStyle,
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
-
       // **Water**
       {
         headerName: "Water",
@@ -578,20 +593,11 @@ const CurrentDataGrid = () => {
         sortable: true,
         filter: true,
         width: 120,
-        cellStyle: {
-          backgroundColor: isDarkMode ? "#424242" : "#ADD8E6",
-          color: isDarkMode ? "#FFFFFF" : "#000000",
-          fontWeight: "500",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
-          overflow: "hidden",
-          textAlign: "right",
-        },
+        cellStyle: waterCellStyle,
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
-
       // **Injected**
       {
         headerName: "Injected",
@@ -599,20 +605,11 @@ const CurrentDataGrid = () => {
         sortable: true,
         filter: true,
         width: 120,
-        cellStyle: {
-          backgroundColor: isDarkMode ? "#424242" : "#E6E6FA",
-          color: isDarkMode ? "#FFFFFF" : "#000000",
-          fontWeight: "500",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
-          overflow: "hidden",
-          textAlign: "right",
-        },
+        cellStyle: injectionCellStyle,
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
-
       // **TBG** (Tubing Pressure)
       {
         headerName: "TBG",
@@ -620,19 +617,11 @@ const CurrentDataGrid = () => {
         sortable: true,
         filter: true,
         width: 100,
-        cellStyle: {
-          backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
-          color: isDarkMode ? "#FFFFFF" : "#000000",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
-          overflow: "hidden",
-          textAlign: "right",
-        },
+        cellStyle: defaultCellStyle,
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
-
       // **CSG** (Casing Pressure)
       {
         headerName: "CSG",
@@ -640,57 +629,11 @@ const CurrentDataGrid = () => {
         sortable: true,
         filter: true,
         width: 100,
-        cellStyle: {
-          backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
-          color: isDarkMode ? "#FFFFFF" : "#000000",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
-          overflow: "hidden",
-          textAlign: "right",
-        },
+        cellStyle: defaultCellStyle,
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
         valueFormatter: (params) =>
           params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
       },
-
-      // **UIC**
-      {
-        headerName: "UIC",
-        field: "UIC",
-        sortable: true,
-        filter: true,
-        width: 100,
-        cellStyle: {
-          backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
-          color: isDarkMode ? "#FFFFFF" : "#000000",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
-          overflow: "hidden",
-          textAlign: "right",
-        },
-        headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
-      },
-
-      // **Target**
-      {
-        headerName: "Target",
-        field: "Target",
-        sortable: true,
-        filter: true,
-        width: 100,
-        cellStyle: {
-          backgroundColor: isDarkMode ? "#424242" : "#FFFFFF",
-          color: isDarkMode ? "#FFFFFF" : "#000000",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
-          overflow: "hidden",
-          textAlign: "right",
-        },
-        headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
-        valueFormatter: (params) =>
-          params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
-      },
-
       // **Comment**
       {
         headerName: "Comment",
@@ -715,7 +658,96 @@ const CurrentDataGrid = () => {
         autoHeight: true,
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       },
-
+      // **OnHand**
+      {
+        headerName: "Bbls OH",
+        field: "OnHand",
+        sortable: true,
+        filter: true,
+        width: 120,
+        cellStyle: {
+          backgroundColor: isDarkMode ? "#424242" : "#eceff1",
+          fontWeight: "500",
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          color: isDarkMode ? "#FFFFFF" : "#000000",
+          textAlign: "right",
+        },
+        headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+        valueFormatter: (params) =>
+          params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
+      },
+      // **Run Bbls**
+      {
+        headerName: "Run Bbls",
+        field: "RunBbls",
+        sortable: true,
+        filter: true,
+        width: 120,
+        cellStyle: {
+          backgroundColor: isDarkMode ? "#424242" : "#cfd8dc",
+          fontWeight: "500",
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          color: isDarkMode ? "#FFFFFF" : "#000000",
+          textAlign: "right",
+        },
+        headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+        valueFormatter: (params) =>
+          params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
+      },
+      // **Water Hauled**
+      {
+        headerName: "Water Hauled",
+        field: "WaterHauledBbls",
+        sortable: true,
+        filter: true,
+        width: 120,
+        cellStyle: {
+          backgroundColor: isDarkMode ? "#424242" : "#bbdefb",
+          fontWeight: "500",
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          color: isDarkMode ? "#FFFFFF" : "#000000",
+          textAlign: "right",
+        },
+        headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+        valueFormatter: (params) =>
+          params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
+      },
+      // **BS&W Draw**
+      {
+        headerName: "BS&W Draw",
+        field: "DrawBbls",
+        sortable: true,
+        filter: true,
+        width: 120,
+        cellStyle: {
+          backgroundColor: isDarkMode ? "#424242" : "#b0bec5",
+          fontWeight: "500",
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          color: isDarkMode ? "#FFFFFF" : "#000000",
+          textAlign: "right",
+        },
+        headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+        valueFormatter: (params) =>
+          params.value !== null ? parseFloat(params.value).toFixed(2) : "0.00",
+      },
+      // **UIC**
+      {
+        headerName: "UIC",
+        field: "UIC",
+        sortable: true,
+        filter: true,
+        width: 100,
+        cellStyle: defaultCellStyle,
+        headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
+      },
       // **Images**
       {
         headerName: "Images",
@@ -735,7 +767,6 @@ const CurrentDataGrid = () => {
         },
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       },
-
       // **Lease ID**
       {
         headerName: "Lease ID",
@@ -761,7 +792,6 @@ const CurrentDataGrid = () => {
         }),
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       },
-
       // **Pumper ID**
       {
         headerName: "Pumper ID",
@@ -787,7 +817,6 @@ const CurrentDataGrid = () => {
         }),
         headerClass: isDarkMode ? "ag-header-dark" : "ag-header-light",
       },
-
       // **Chart Button**
       {
         headerName: "Chart",
@@ -844,7 +873,6 @@ const CurrentDataGrid = () => {
           "csg",
           "PriorTbg",
           "PriorCsg",
-          "ImageCount",
           "gaugecomments",
           "UIC",
           "Target",

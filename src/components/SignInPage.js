@@ -12,7 +12,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import logo from "../assets/logo.jpg";
 import { useUser } from "./UserContext";
-import { baseUrl } from "./config"; // Importing the baseUrl from config.js
+import { baseUrl } from "./config";
 
 function SignInPage() {
   const navigate = useNavigate();
@@ -89,11 +89,13 @@ function SignInPage() {
 
       const data = await response.json();
       if (data.success) {
-        const { user } = data;
-        setUser(user.Role, user.UserID);
+        const { user, companyName } = data;
+        setUser(user.Role, user.UserID, companyName);
         localStorage.setItem("userRole", user.Role);
         localStorage.setItem("userID", user.UserID);
-        navigate("/home");
+        localStorage.setItem("companyName", companyName);
+
+        navigate("/dashboard");
       } else {
         setError("Failed to create new user");
       }
@@ -105,6 +107,7 @@ function SignInPage() {
   };
 
   function hashPassword(password) {
+    // Simplified hash function; replace with a stronger algorithm in production
     let hash = 0,
       i,
       chr;
@@ -129,14 +132,15 @@ function SignInPage() {
           },
           body: JSON.stringify({ username, password }),
         });
-
         const data = await response.json();
-        const { success, message, user } = data;
-
+        const { success, message, user, companyName } = data;
         if (success) {
-          setUser(user.Role, user.UserID);
+          setUser(user.Role, user.UserID, companyName);
+
           localStorage.setItem("userRole", user.Role);
           localStorage.setItem("userID", user.UserID);
+          localStorage.setItem("companyName", companyName);
+
           localStorage.setItem(
             "credentials",
             JSON.stringify({
@@ -144,6 +148,7 @@ function SignInPage() {
               password: hashPassword(password),
               role: user.Role,
               userID: user.UserID,
+              companyName: companyName,
             })
           );
 
@@ -169,6 +174,7 @@ function SignInPage() {
         password: storedPasswordHash,
         role,
         userID,
+        companyName,
       } = storedCredentials;
       const enteredPasswordHash = hashPassword(password);
 
@@ -176,11 +182,16 @@ function SignInPage() {
         username === storedUsername &&
         enteredPasswordHash === storedPasswordHash
       ) {
-        setUser(role, userID);
+        setUser(role, userID, companyName);
         localStorage.setItem("userRole", role);
         localStorage.setItem("userID", userID);
+        localStorage.setItem("companyName", companyName);
 
-        navigate("/home");
+        if (role === "P") {
+          navigate("/pumper");
+        } else {
+          navigate("/home");
+        }
       } else {
         setError("Invalid credentials. Please sign in online first.");
       }
@@ -202,11 +213,17 @@ function SignInPage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          const { user } = data;
-          setUser(user.Role, user.UserID);
+          const { user, companyName } = data;
+          setUser(user.Role, user.UserID, companyName);
           localStorage.setItem("userRole", user.Role);
           localStorage.setItem("userID", user.UserID);
-          navigate("/home");
+          localStorage.setItem("companyName", companyName);
+
+          if (user.Role === "P") {
+            navigate("/pumper");
+          } else {
+            navigate("/home");
+          }
         } else if (data.message === "User not found") {
           setShowPrompt(true);
           setToken(token);
@@ -230,11 +247,17 @@ function SignInPage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          const { user } = data;
-          setUser(user.Role, user.UserID);
+          const { user, companyName } = data;
+          setUser(user.Role, user.UserID, companyName);
           localStorage.setItem("userRole", user.Role);
           localStorage.setItem("userID", user.UserID);
-          navigate("/home");
+          localStorage.setItem("companyName", companyName);
+
+          if (user.Role === "P") {
+            navigate("/pumper");
+          } else {
+            navigate("/home");
+          }
         } else {
           setError("Google Sign-In failed.");
         }
@@ -405,6 +428,13 @@ function SignInPage() {
                 onChange={(e) => setUserID(e.target.value)}
                 className="w-full border-gray-300 border-2 rounded-md px-4 py-2 text-base focus:outline-none focus:ring-4 focus:ring-gray-400 focus:border-transparent transition-all duration-300"
                 placeholder="User ID"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full border-gray-300 border-2 rounded-md px-4 py-2 text-base mt-4 focus:outline-none focus:ring-4 focus:ring-gray-400 focus:border-transparent transition-all duration-300"
+                placeholder="Password"
               />
               <button
                 className="bg-green-500 text-white py-2 px-6 rounded-md hover:bg-green-600 transition duration-300 shadow-md mt-4"
