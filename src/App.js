@@ -19,6 +19,7 @@ import Chart from "./components/Charts";
 import Inv from "./components/LeaseInventory";
 import ProductionSummary from "./components/ProductionSummary";
 import Reports from "./components/Reports";
+import Gauges from "./components/Gauges";
 function TitleUpdater() {
   const location = useLocation();
 
@@ -72,6 +73,15 @@ function App() {
               </Layout>
             }
           />
+          <Route
+            path="/GaugeEntry"
+            element={
+              <Layout>
+                <Gauges />
+              </Layout>
+            }
+          />
+
           <Route
             path="/reports"
             element={

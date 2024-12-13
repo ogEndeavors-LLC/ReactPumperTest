@@ -170,8 +170,12 @@ const GaugeEntry = () => {
             </select>
           </div>
 
+          {/* Modified GO button to navigate to /GaugeEntry */}
           <div>
-            <button className="w-full bg-gradient-to-br from-indigo-900 to-indigo-800 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg text-lg transition duration-300 ease-in-out">
+            <button
+              className="w-full bg-gradient-to-br from-indigo-900 to-indigo-800 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg text-lg transition duration-300 ease-in-out"
+              onClick={() => (window.location.href = "/GaugeEntry")}
+            >
               GO
             </button>
           </div>
