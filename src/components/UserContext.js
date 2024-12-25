@@ -25,7 +25,7 @@ export const UserProvider = ({ children }) => {
 
     const storedCompanyName = localStorage.getItem("companyName");
     if (storedCompanyName) {
-      setUserID(storedCompanyName);
+      setCompanyName(storedCompanyName);
     }
   }, []);
 

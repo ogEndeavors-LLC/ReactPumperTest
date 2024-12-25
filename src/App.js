@@ -81,6 +81,14 @@ function App() {
               </Layout>
             }
           />
+          <Route
+            path="/GaugeEntry/:leaseid"
+            element={
+              <Layout>
+                <Gauges />
+              </Layout>
+            }
+          />
 
           <Route
             path="/reports"

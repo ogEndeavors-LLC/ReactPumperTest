@@ -6,12 +6,20 @@ import { useUser } from "./UserContext";
 
 const GaugeEntry = () => {
   const { theme } = useTheme();
-  const [wells, setWells] = useState([]);
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedOption, setSelectedOption] = useState("");
   const { userID } = useUser();
-  const [userDetails, setUserDetails] = useState(null);
 
+  // State for user details
+  const [userDetails, setUserDetails] = useState(null);
+  // State for leases
+  const [leases, setLeases] = useState([]);
+  // State for selected date
+  const [selectedDate, setSelectedDate] = useState("");
+  // State for selected lease ID
+  const [selectedLeaseID, setSelectedLeaseID] = useState("");
+  // State for selected action
+  const [selectedAction, setSelectedAction] = useState("Daily Gauges");
+
+  // Fetch user details
   const fetchUserDetails = useCallback(async () => {
     try {
       const response = await fetch(
@@ -29,25 +37,13 @@ const GaugeEntry = () => {
     }
   }, [userID]);
 
+  // Fetch all leases
   const fetchLeases = useCallback(async () => {
     try {
       const response = await fetch(`${baseUrl}/api/leases.php`);
       if (!response.ok) throw new Error("Network response was not ok");
       const leaseData = await response.json();
-
-      const allWells = leaseData.flatMap((lease) =>
-        lease.Wells.map((well) => ({
-          ...well,
-          LeaseName: lease.LeaseName,
-        }))
-      );
-
-      const filteredWells = allWells.filter(
-        (well, index) =>
-          index === 0 || well.LeaseName !== allWells[index - 1].LeaseName
-      );
-
-      setWells(filteredWells);
+      setLeases(leaseData);
     } catch (error) {
       console.error("Error fetching leases:", error);
     }
@@ -59,6 +55,33 @@ const GaugeEntry = () => {
     const currentDate = new Date().toISOString().split("T")[0];
     setSelectedDate(currentDate);
   }, [fetchLeases, fetchUserDetails]);
+
+  // Prepare filtered & sorted leases:
+  // - If user is admin, show all leases
+  // - Otherwise show only leases with pumperID or reliefID = userDetails.UserID
+  const isAdmin =
+    userDetails?.IsAdmin === "Y" ||
+    userDetails?.UserID?.toLowerCase() === "admin";
+
+  const filteredLeases = leases
+    .filter((lease) => {
+      return (
+        isAdmin ||
+        lease.PumperID?.toLowerCase() === userID?.toLowerCase() ||
+        lease.ReliefID?.toLowerCase() === userID?.toLowerCase()
+      );
+    })
+    .sort((a, b) => a.LeaseName.localeCompare(b.LeaseName));
+
+  // Handle the GO button click
+  const handleGoClick = () => {
+    // Navigate to the next page (e.g., /GaugeEntry) with selectedLeaseID in the query string
+    if (selectedLeaseID) {
+      window.location.href = `/GaugeEntry?leaseid=${selectedLeaseID}`;
+    } else {
+      alert("Please select a Lease first.");
+    }
+  };
 
   return (
     <div
@@ -119,6 +142,7 @@ const GaugeEntry = () => {
         </div>
 
         <div className="grid grid-cols-1 gap-6">
+          {/* Gauge Date */}
           <div>
             <label className="block mb-2 text-lg font-medium">
               Gauge Date:
@@ -135,6 +159,7 @@ const GaugeEntry = () => {
             />
           </div>
 
+          {/* Lease Selector */}
           <div>
             <label className="block mb-2 text-lg font-medium">Lease:</label>
             <select
@@ -143,16 +168,19 @@ const GaugeEntry = () => {
                   ? "bg-gray-800 text-white border-gray-600"
                   : "bg-gray-100 text-gray-900 border-gray-300"
               } border rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out`}
-              onChange={(e) => setSelectedOption(e.target.value)}
+              value={selectedLeaseID}
+              onChange={(e) => setSelectedLeaseID(e.target.value)}
             >
-              {wells.map((well, index) => (
-                <option key={index} value={well.WellName}>
-                  {well.WellName} {well.LeaseName}
+              <option value="">-- Select a Lease --</option>
+              {filteredLeases.map((lease) => (
+                <option key={lease.LeaseID} value={lease.LeaseID}>
+                  {lease.LeaseName}
                 </option>
               ))}
             </select>
           </div>
 
+          {/* Action Selector */}
           <div>
             <label className="block mb-2 text-lg font-medium">Action:</label>
             <select
@@ -161,8 +189,8 @@ const GaugeEntry = () => {
                   ? "bg-gray-800 text-white border-gray-600"
                   : "bg-gray-100 text-gray-900 border-gray-300"
               } border rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out`}
-              value={selectedOption}
-              onChange={(e) => setSelectedOption(e.target.value)}
+              value={selectedAction}
+              onChange={(e) => setSelectedAction(e.target.value)}
             >
               <option value="Daily Gauges">Daily Gauges</option>
               <option value="Add Run Ticket">Run Ticket</option>
@@ -170,16 +198,17 @@ const GaugeEntry = () => {
             </select>
           </div>
 
-          {/* Modified GO button to navigate to /GaugeEntry */}
+          {/* GO button -> Navigates with query params */}
           <div>
             <button
               className="w-full bg-gradient-to-br from-indigo-900 to-indigo-800 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg text-lg transition duration-300 ease-in-out"
-              onClick={() => (window.location.href = "/GaugeEntry")}
+              onClick={handleGoClick}
             >
               GO
             </button>
           </div>
 
+          {/* View Inventory & View Production Buttons */}
           <div className="flex flex-col sm:flex-row justify-between space-y-4 sm:space-y-0 sm:space-x-4">
             <button className="w-full sm:w-auto bg-gradient-to-br from-blue-900 to-blue-800 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg text-lg transition duration-300 ease-in-out">
               View Inventory
