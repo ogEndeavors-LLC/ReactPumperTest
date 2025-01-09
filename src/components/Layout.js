@@ -12,6 +12,12 @@ import ChartIcon from "@mui/icons-material/ShowChart"; // Import the Chart Icon
 import Footer from "./Footer";
 import logo from "../assets/100.png";
 import moment from "moment";
+
+/* ------------------------- BREAKPOINTS ------------------------- */
+/* Adjust as desired for iPad and iPhone. 1024px typically covers iPad in portrait mode. */
+const TABLET_BREAKPOINT = "1024px";
+
+/* ------------------------- GLOBAL STYLE ------------------------- */
 const GlobalStyle = createGlobalStyle`
   body {
     font-family: 'Inter', sans-serif;
@@ -20,27 +26,11 @@ const GlobalStyle = createGlobalStyle`
       theme === "dark" ? "#121212" : "#FFFFFF"};
   }
 `;
+
+/* ------------------------- DROPDOWN COMPONENTS ------------------------- */
 const DropdownContainer = styled.div`
   position: relative;
   display: inline-block;
-`;
-const DetailsButton = styled.button`
-  padding: 10px 20px;
-  border: none;
-  border-radius: 50px;
-  background-color: ${({ theme }) =>
-    theme === "dark" ? "#4E9F3D" : "#76C893"};
-  color: white;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-
-  &:hover {
-    background-color: ${({ theme }) =>
-      theme === "dark" ? "#3d7a2e" : "#5da671"};
-    transform: translateY(-2px);
-  }
 `;
 
 const DropdownSummary = styled.summary`
@@ -71,8 +61,8 @@ const DropdownContent = styled.div`
   background-color: ${({ theme }) =>
     theme === "dark" ? "#2d3748" : "#ffffff"};
   min-width: 160px;
-  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
-  z-index: 1;
+  box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+  z-index: 2;
   border-radius: 4px;
   overflow: hidden;
   transition: opacity 0.3s ease, transform 0.3s ease;
@@ -80,6 +70,20 @@ const DropdownContent = styled.div`
   transform: ${({ isOpen }) =>
     isOpen ? "translateY(0)" : "translateY(-10px)"};
   pointer-events: ${({ isOpen }) => (isOpen ? "all" : "none")};
+`;
+
+const NavDropdownItem = styled.div`
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+  text-align: center; /* Center the dropdown items */
+  color: ${({ theme }) => (theme === "dark" ? "#e2e8f0" : "#2d3748")};
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: ${({ theme }) =>
+      theme === "dark" ? "#4a5568" : "#edf2f7"};
+  }
 `;
 
 const NavDropdown = ({ children, theme }) => {
@@ -98,19 +102,7 @@ const NavDropdown = ({ children, theme }) => {
   );
 };
 
-const NavDropdownItem = styled.div`
-  padding: 12px 16px;
-  text-decoration: none;
-  display: block;
-  color: ${({ theme }) => (theme === "dark" ? "#e2e8f0" : "#2d3748")};
-  transition: background-color 0.3s ease;
-
-  &:hover {
-    background-color: ${({ theme }) =>
-      theme === "dark" ? "#4a5568" : "#edf2f7"};
-  }
-`;
-
+/* ------------------------- NAVBAR ------------------------- */
 const NavBarContainer = styled(animated.nav)`
   display: flex;
   justify-content: space-between;
@@ -126,9 +118,8 @@ const NavBarContainer = styled(animated.nav)`
   z-index: 100;
   transition: all 0.3s ease;
 
-  @media (max-width: 768px) {
-    flex-direction: column;
-    align-items: center;
+  /* Hamburger layout up to 1024px (iPad and iPhone) */
+  @media (max-width: ${TABLET_BREAKPOINT}) {
     padding: 0.5rem 1rem;
   }
 `;
@@ -162,6 +153,34 @@ const Logo = styled.div`
   }
 `;
 
+/* Wrap nav items so we can show/hide them on iPad/mobile */
+const NavItemsWrapper = styled.div`
+  display: flex;
+  align-items: center;
+
+  /* On screens <= 1024px, position fixed for the hamburger menu */
+  @media (max-width: ${TABLET_BREAKPOINT}) {
+    position: fixed;
+    top: 60px;
+    right: 0;
+    width: 70%;
+    height: calc(100vh - 60px);
+    background: ${({ theme }) =>
+      theme === "dark" ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.9)"};
+    backdrop-filter: blur(8px);
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: 1rem;
+    box-shadow: -2px 0 15px rgba(0, 0, 0, 0.1);
+    transform: ${({ isMobileMenuOpen }) =>
+      isMobileMenuOpen ? "translateX(0)" : "translateX(100%)"};
+    opacity: ${({ isMobileMenuOpen }) => (isMobileMenuOpen ? "1" : "0")};
+    transition: transform 0.4s ease, opacity 0.3s ease;
+    z-index: 99;
+  }
+`;
+
 const NavItems = styled.div`
   display: flex;
   align-items: center;
@@ -169,10 +188,11 @@ const NavItems = styled.div`
   position: relative;
   flex-wrap: wrap;
 
-  @media (max-width: 768px) {
+  /* Stack vertically on screens <= 1024px */
+  @media (max-width: ${TABLET_BREAKPOINT}) {
+    flex-direction: column;
     width: 100%;
-    justify-content: space-evenly;
-    margin-top: 0.5rem;
+    margin-top: 1rem;
   }
 
   .material-symbols-outlined {
@@ -202,8 +222,70 @@ const NavItem = styled(animated.div)`
     font-size: 24px;
     color: inherit;
   }
+
+  @media (max-width: ${TABLET_BREAKPOINT}) {
+    border-radius: 6px;
+    width: 100%;
+    justify-content: flex-start;
+    padding: 10px 20px;
+    &:hover {
+      background-color: ${({ theme }) =>
+        theme === "dark" ? "rgba(255,255,255,0.1)" : "#f5f5f5"};
+    }
+  }
 `;
 
+/* ------------------------- HAMBURGER BUTTON ------------------------- */
+const HamburgerButton = styled.button`
+  display: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+
+  /* Show the hamburger on screens <= 1024px */
+  @media (max-width: ${TABLET_BREAKPOINT}) {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: space-around;
+    width: 32px;
+    height: 24px;
+
+    &:focus {
+      outline: none;
+    }
+
+    div {
+      width: 32px;
+      height: 3px;
+      background: ${({ theme }) => (theme === "dark" ? "#FFF" : "#333")};
+      border-radius: 3px;
+      transition: all 0.3s ease;
+      transform-origin: 1px;
+    }
+
+    /* Top bar transform */
+    div:first-child {
+      transform: ${({ isMobileMenuOpen }) =>
+        isMobileMenuOpen ? "rotate(45deg) translate(5px, 5px)" : "rotate(0)"};
+    }
+
+    /* Middle bar fades out when open */
+    div:nth-child(2) {
+      opacity: ${({ isMobileMenuOpen }) => (isMobileMenuOpen ? "0" : "1")};
+      transform: ${({ isMobileMenuOpen }) =>
+        isMobileMenuOpen ? "translateX(-20px)" : "translateX(0)"};
+    }
+
+    /* Bottom bar transform */
+    div:last-child {
+      transform: ${({ isMobileMenuOpen }) =>
+        isMobileMenuOpen ? "rotate(-45deg) translate(6px, -6px)" : "rotate(0)"};
+    }
+  }
+`;
+
+/* ------------------------- ADMIN BUTTON ------------------------- */
 const AdminButton = styled.button`
   padding: 8px 16px;
   border: none;
@@ -228,6 +310,7 @@ const AdminButton = styled.button`
       theme === "dark" ? "#3367D6" : "#F2F2F2"};
   }
 
+  /* Hide Admin button on smaller devices. Remove if you want it to remain visible. */
   @media (max-width: 768px) {
     display: none;
   }
@@ -242,6 +325,7 @@ const AdminButton = styled.button`
   }
 `;
 
+/* ------------------------- THEME TOGGLE BUTTON ------------------------- */
 const ThemeToggleButton = styled(NavItem)`
   transition: transform 0.5s ease;
 
@@ -261,6 +345,7 @@ const ThemeToggleButton = styled(NavItem)`
   }
 `;
 
+/* ------------------------- PROFILE CARD ------------------------- */
 const ProfileCard = styled(animated.div)`
   position: absolute;
   top: 60px;
@@ -304,14 +389,33 @@ const UserName = styled.div`
   font-size: 24px;
   font-weight: 700;
   margin-bottom: 10px;
-  color: ${({ theme }) => (theme === "dark" ? "#FFFFFF" : "#22222")};
+  color: ${({ theme }) => (theme === "dark" ? "#FFFFFF" : "#222222")};
 `;
 
 const UserRole = styled.div`
   font-family: "Inter", sans-serif;
   font-size: 16px;
-  color: ${({ theme }) => (theme === "dark" ? "#AAAAAA" : "55555")};
+  color: ${({ theme }) => (theme === "dark" ? "#AAAAAA" : "#555555")};
   margin-bottom: 20px;
+`;
+
+const DetailsButton = styled.button`
+  padding: 10px 20px;
+  border: none;
+  border-radius: 50px;
+  background-color: ${({ theme }) =>
+    theme === "dark" ? "#4E9F3D" : "#76C893"};
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+
+  &:hover {
+    background-color: ${({ theme }) =>
+      theme === "dark" ? "#3d7a2e" : "#5da671"};
+    transform: translateY(-2px);
+  }
 `;
 
 const SignOutButton = styled.button`
@@ -343,19 +447,29 @@ const CloseIcon = styled.div`
   }
 `;
 
+/* ------------------------- MAIN LAYOUT COMPONENT ------------------------- */
 function Layout({ children }) {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const { userRole, userID, setUser, companyName } = useUser();
+
   const [spinning, setSpinning] = useState(false);
   const [profileCardVisible, setProfileCardVisible] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  /* Spring animations */
   const profileCardAnimation = useSpring({
     opacity: profileCardVisible ? 1 : 0,
     transform: profileCardVisible ? "translateY(0)" : "translateY(-20px)",
     config: { mass: 1, tension: 210, friction: 20 },
   });
 
+  const navBarAnimation = useSpring({
+    from: { opacity: 0 },
+    to: { opacity: 1 },
+  });
+
+  /* Handlers */
   const handleSignOut = useCallback(() => {
     localStorage.removeItem("userRole");
     localStorage.removeItem("userID");
@@ -378,20 +492,21 @@ function Layout({ children }) {
     return "";
   }, []);
 
-  const navBarAnimation = useSpring({
-    from: { opacity: 0 },
-    to: { opacity: 1 },
-  });
-
   const handleDetailsClick = useCallback(() => {
     navigate("/profile-details");
     setProfileCardVisible(false);
   }, [navigate]);
 
-  const toggleProfileCard = useCallback(
-    () => setProfileCardVisible(!profileCardVisible),
-    [profileCardVisible]
-  );
+  const toggleProfileCard = useCallback(() => {
+    setProfileCardVisible((prev) => !prev);
+  }, []);
+
+  /* Toggle for hamburger menu */
+  const toggleMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen((prev) => !prev);
+    // Ensure the profile card is closed when opening the menu
+    setProfileCardVisible(false);
+  }, []);
 
   return (
     <div
@@ -403,92 +518,147 @@ function Layout({ children }) {
     >
       <GlobalStyle theme={theme} />
       <NavBarContainer style={navBarAnimation} theme={theme}>
+        {/* Logo/Home */}
         <Logo onClick={() => navigate("/home")} theme={theme}>
-          <HomeIcon className="material-icon" />
+          <HomeIcon />
           <span>
-            {" "}
             {companyName && companyName.length > 3
               ? companyName
               : "ogFieldTicket"}
           </span>
-        </Logo>{" "}
-        <NavItems>
-          {userRole !== "P" && (
-            <AdminButton theme={theme} onClick={() => navigate("/admin-panel")}>
-              Admin Panel
-            </AdminButton>
-          )}
-          <NavItem onClick={() => navigate("/prod")} theme={theme}>
-            Current Production
-          </NavItem>
-          <NavItem onClick={() => navigate("/pumper")} theme={theme}>
-            Gauge Entry
-          </NavItem>
-          <NavItem onClick={() => navigate("/Charts")} theme={theme}>
-            Charts
-          </NavItem>
-          <NavDropdown theme={theme}>
-            <summary>Inventory</summary>
-            <NavDropdownItem onClick={() => navigate("/inv?type=lease")}>
-              By Lease
-            </NavDropdownItem>
-            <NavDropdownItem
-              onClick={() => {
-                const startDate = moment()
-                  .subtract(1, "month")
-                  .startOf("month")
-                  .format("YYYY-MM-DD");
-                const thruDate = moment().format("YYYY-MM-DD");
-                navigate(
-                  `/reports?Rpt=O&LeaseID=&StartDate=${startDate}&Thru=${thruDate}`
-                );
-              }}
+        </Logo>
+
+        {/* Hamburger (for iPad & iPhone up to 1024px) */}
+        <HamburgerButton
+          theme={theme}
+          isMobileMenuOpen={isMobileMenuOpen}
+          onClick={toggleMobileMenu}
+        >
+          <div />
+          <div />
+          <div />
+        </HamburgerButton>
+
+        {/* Nav items (hidden behind hamburger on iPad/iPhone) */}
+        <NavItemsWrapper theme={theme} isMobileMenuOpen={isMobileMenuOpen}>
+          <NavItems>
+            {/* Admin panel if userRole != 'P' */}
+            {userRole !== "P" && (
+              <AdminButton
+                theme={theme}
+                onClick={() => navigate("/admin-panel")}
+              >
+                Admin Panel
+              </AdminButton>
+            )}
+
+            {/* Production */}
+            <NavItem onClick={() => navigate("/prod")} theme={theme}>
+              Current Production
+            </NavItem>
+
+            {/* Gauge Entry */}
+            <NavItem onClick={() => navigate("/pumper")} theme={theme}>
+              Gauge Entry
+            </NavItem>
+
+            {/* Charts */}
+            <NavItem onClick={() => navigate("/Charts")} theme={theme}>
+              Charts
+            </NavItem>
+
+            {/* Inventory Dropdown */}
+            <NavDropdown theme={theme}>
+              <summary>Inventory</summary>
+              <NavDropdownItem
+                theme={theme}
+                onClick={() => navigate("/inv?type=lease")}
+              >
+                By Lease
+              </NavDropdownItem>
+              <NavDropdownItem
+                theme={theme}
+                onClick={() => {
+                  const startDate = moment()
+                    .subtract(1, "month")
+                    .startOf("month")
+                    .format("YYYY-MM-DD");
+                  const thruDate = moment().format("YYYY-MM-DD");
+                  navigate(
+                    `/reports?Rpt=O&LeaseID=&StartDate=${startDate}&Thru=${thruDate}`
+                  );
+                }}
+              >
+                By Tank
+              </NavDropdownItem>
+            </NavDropdown>
+
+            {/* Reports Dropdown */}
+            <NavDropdown theme={theme}>
+              <summary>Reports</summary>
+              <NavDropdownItem
+                theme={theme}
+                onClick={() => navigate("/reports")}
+              >
+                By Lease
+              </NavDropdownItem>
+              <NavDropdownItem
+                theme={theme}
+                onClick={() => navigate("/prodSummary")}
+              >
+                Production Summary
+              </NavDropdownItem>
+            </NavDropdown>
+
+            {/* Profile Icon */}
+            <NavItem onClick={toggleProfileCard} theme={theme}>
+              <span className="material-symbols-outlined">account_circle</span>
+            </NavItem>
+
+            {/* Theme Toggle */}
+            <ThemeToggleButton
+              onClick={handleThemeToggle}
+              spinning={spinning}
+              theme={theme}
             >
-              By Tank
-            </NavDropdownItem>
-          </NavDropdown>
-          <NavDropdown theme={theme}>
-            <summary>Reports</summary>
-            <NavDropdownItem onClick={() => navigate("/reports")}>
-              By Lease
-            </NavDropdownItem>
-            <NavDropdownItem onClick={() => navigate("/prodSummary")}>
-              Production Summary
-            </NavDropdownItem>
-          </NavDropdown>
-          <NavItem onClick={toggleProfileCard} theme={theme}>
-            <span className="material-symbols-outlined">account_circle</span>
-          </NavItem>
-          <ThemeToggleButton onClick={handleThemeToggle} spinning={spinning}>
-            <span className="material-symbols-outlined">
-              {theme === "dark" ? "dark_mode" : "light_mode"}
-            </span>
-          </ThemeToggleButton>
-          <NavItem onClick={handleSignOut} theme={theme}>
-            <span className="material-symbols-outlined">logout</span>
-          </NavItem>
-          {profileCardVisible && (
-            <OutsideClickHandler
-              onOutsideClick={() => setProfileCardVisible(false)}
-            >
-              <ProfileCard style={profileCardAnimation} theme={theme}>
-                <CloseIcon onClick={toggleProfileCard}>
-                  <span className="material-symbols-outlined">close</span>
-                </CloseIcon>
-                <UserAvatar>
-                  <img src={logo} alt="Logo" />
-                </UserAvatar>
-                <UserName>{userID ? userID : "Signed in"}</UserName>
-                <UserRole>Hello {capitalizeFirstLetter(userID)}!</UserRole>
-                <DetailsButton onClick={handleDetailsClick}>
-                  Profile Details
-                </DetailsButton>
-              </ProfileCard>
-            </OutsideClickHandler>
-          )}
-        </NavItems>
+              <span className="material-symbols-outlined">
+                {theme === "dark" ? "dark_mode" : "light_mode"}
+              </span>
+            </ThemeToggleButton>
+
+            {/* Sign Out */}
+            <NavItem onClick={handleSignOut} theme={theme}>
+              <span className="material-symbols-outlined">logout</span>
+            </NavItem>
+
+            {/* Profile Card (shown when profile icon is clicked) */}
+            {profileCardVisible && (
+              <OutsideClickHandler
+                onOutsideClick={() => setProfileCardVisible(false)}
+              >
+                <ProfileCard style={profileCardAnimation} theme={theme}>
+                  <CloseIcon onClick={toggleProfileCard}>
+                    <span className="material-symbols-outlined">close</span>
+                  </CloseIcon>
+                  <UserAvatar>
+                    <img src={logo} alt="Logo" />
+                  </UserAvatar>
+                  <UserName>{userID || "Signed in"}</UserName>
+                  <UserRole>Hello {capitalizeFirstLetter(userID)}!</UserRole>
+                  <DetailsButton onClick={handleDetailsClick} theme={theme}>
+                    Profile Details
+                  </DetailsButton>
+                </ProfileCard>
+              </OutsideClickHandler>
+            )}
+          </NavItems>
+        </NavItemsWrapper>
       </NavBarContainer>
+
+      {/* MAIN CONTENT */}
       <main style={{ paddingTop: "4rem" }}>{children}</main>
+
+      {/* FOOTER */}
       <Footer />
     </div>
   );

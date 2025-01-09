@@ -5,13 +5,14 @@ import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import { baseUrl } from "./config.js";
-import { faBullseye } from "@fortawesome/free-solid-svg-icons";
 
+/**
+ * MAIN COMPONENT
+ */
 function GaugeEntryPage() {
   /*************************************************
    * 0) Fetch client-level flags from API
    *************************************************/
-  // For example: useBSW, use24, useMaps, showWells, ...
   const [showBSW, setShowBSW] = useState(false);
   const [use24, setUse24] = useState(false);
   const [useLinePressure, setUseLinePressure] = useState(false);
@@ -22,29 +23,22 @@ function GaugeEntryPage() {
   const [manualWaterLabel, setManualWaterLabel] = useState("Produced Water");
   const [manualWaterLabel2, setManualWaterLabel2] = useState("bbls");
 
+  // Example: fetch client-level settings once
   useEffect(() => {
-    // Example client-level settings fetch:
     fetch(`${baseUrl}/api/clientDetails.php`)
       .then((res) => res.json())
       .then((data) => {
-        // This assumes data returns an array with at least one object
         if (data && Array.isArray(data) && data.length > 0) {
           const clientInfo = data[0];
-          // Adjust your flags according to the presence of "Y"/"N"
           setShowBSW(clientInfo.useBSW === "Y");
           setUse24(clientInfo.use24 === "Y");
           setUseLinePressure(clientInfo.useLinePressure === "Y");
           setShowWells(clientInfo.ShowWells === "Y");
           setUseColorCut(clientInfo.UseColorCut === "Y");
           setUseImages(clientInfo.UseImages === "Y");
-
-          // The API might say "ShowPOC" is "Y" or "N"
-          // In your sample, ShowPOC is "N" by default
           if (clientInfo.ShowPOC === "N") {
             setShowPOC(false);
           }
-
-          // Water labels
           if (clientInfo.ManualWaterLabel) {
             setManualWaterLabel(clientInfo.ManualWaterLabel);
           }
@@ -96,7 +90,6 @@ function GaugeEntryPage() {
 
   useEffect(() => {
     if (!paramLeaseID) return;
-
     // Suppose this is your standard lease-level fetch
     const url = `${baseUrl}/api/leases.php?leaseid=${paramLeaseID}`;
     fetch(url)
@@ -169,6 +162,17 @@ function GaugeEntryPage() {
         wellOn: w.Active === "Y" ? "Y" : "N",
         reasonDown: "NU",
         note: "",
+        tbg: "",
+        csg: "",
+        oilTest: "",
+        gasTest: "",
+        waterTest: "",
+        TSTM: "",
+        JTF: "",
+        FTF: "",
+        FAP: "",
+        GFFAP: "",
+        SND: "",
       }));
       setWellEntries(mappedWells);
     }
@@ -185,8 +189,14 @@ function GaugeEntryPage() {
   });
   const [role] = useState(userSession.role);
 
-  // "Gauge Date" placeholder
-  const [gaugeDate] = useState("2024-01-01");
+  // We'll assume "Gauge Date" as a placeholder
+  const [gaugeDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0"); // Months are 0-based
+    const dd = String(today.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
 
   // "src" logic
   const [src] = useState("-");
@@ -199,7 +209,7 @@ function GaugeEntryPage() {
   const [showMcf, setShowMcf] = useState(true);
   const [showMcfAccum, setShowMcfAccum] = useState(true);
 
-  // LACT (if you need them)
+  // LACT
   const [useLACT] = useState(false);
   const [showLACT] = useState(false);
 
@@ -234,7 +244,7 @@ function GaugeEntryPage() {
   const [comments, setComments] = useState("");
 
   /*************************************************
-   * 5) Summaries
+   * 5) Summaries (oil/water)
    *************************************************/
   const [oilProduced, setOilProduced] = useState(0);
   const [oilOnHand, setOilOnHand] = useState(0);
@@ -251,8 +261,8 @@ function GaugeEntryPage() {
   const [meteredWater, setMeteredWater] = useState(0);
   const [meteredGas, setMeteredGas] = useState(0);
 
+  // Recalculate oil tanks if user changes gauge
   useEffect(() => {
-    // Oil
     let totalOilInches = 0;
     let totalOilBbls = 0;
     let totalColorCutBbls = 0;
@@ -281,8 +291,8 @@ function GaugeEntryPage() {
     setDrawBbls(1.5);
   }, [oilGauges, useColorCut]);
 
+  // Recalculate water tanks if user changes gauge
   useEffect(() => {
-    // Water
     let totalWaterInches = 0;
     let totalWaterBbls = 0;
 
@@ -299,67 +309,259 @@ function GaugeEntryPage() {
     setWaterHauledBbls(10);
   }, [waterGauges]);
 
+  // Metered Water
   useEffect(() => {
-    // Metered Water
     setMeteredWater(waterMeter);
   }, [waterMeter, waterMeterReset]);
 
+  // Metered Gas
   useEffect(() => {
-    // Metered Gas
     setMeteredGas(gasMeter);
   }, [gasMeter, gasMeterReset]);
 
   /*************************************************
-   * 6) History
+   * 6) Recent Gauge History - REPLACED WITH AG GRID
    *************************************************/
   const [expandHistory, setExpandHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyRowData, setHistoryRowData] = useState([]);
+  const [pinnedTopRowData, setPinnedTopRowData] = useState([]);
 
+  // Hard-coded "T" for Gauges By Tank
+  const [selectedReport] = useState("T");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // 1) Validate
+    if (!validateForm()) {
+      console.warn("Form validation failed");
+      return;
+    }
+
+    // 2) Build FormData
+    const formData = new FormData();
+
+    // Hidden / standard fields
+    formData.append("lid", leaseID);
+    formData.append("gdate", gaugeDate);
+    formData.append("showWells", showWells ? "Y" : "N");
+
+    // For debugging: log to console
+    console.log("Preparing to post gauge data:", {
+      leaseID,
+      gaugeDate,
+      showWells,
+    });
+
+    // OIL GAUGES
+    oilGauges.forEach((tank, idx) => {
+      console.log(`OilGauge row #${idx}`, tank);
+
+      formData.append("gaugeid[]", String(tank.GaugeID)); // numeric
+      formData.append("tankid[]", String(tank.TankID || ""));
+      formData.append("override[]", "N");
+      formData.append("gaugeft[]", String(tank.gaugeFt || 0));
+      formData.append("gaugein[]", String(tank.gaugeIn || 0));
+      formData.append("overridebbls[]", String(tank.overrideBbls || 0));
+      // if you have hold-overridebbls, accumoverridebbls, etc.
+      formData.append("accumoverridebbls[]", "0.00");
+      // colorcutft[], colorcutin[]
+    });
+
+    // WATER GAUGES
+    waterGauges.forEach((wt, idx) => {
+      console.log(`WaterGauge row #${idx}`, wt);
+
+      formData.append("wgaugeid[]", String(wt.GaugeID)); // numeric
+      formData.append("wgaugeft[]", String(wt.gaugeFt || 0));
+      formData.append("wgaugein[]", String(wt.gaugeIn || 0));
+    });
+
+    // WELLS (if showWells=Y)
+    if (showWells) {
+      wellEntries.forEach((well, idx) => {
+        console.log(`Well row #${idx}`, well);
+
+        formData.append("wellgaugeid[]", String(well.WellGaugeId)); // numeric
+        formData.append("wellon[]", well.wellOn || "Y");
+        formData.append("reasondown[]", well.reasonDown || "");
+        formData.append("note[]", well.note || "");
+        formData.append("welltbg[]", String(well.tbg || 0));
+        formData.append("wellcsg[]", String(well.csg || 0));
+        formData.append("testoil[]", String(well.oilTest || 0));
+        formData.append("testgas[]", String(well.gasTest || 0));
+        formData.append("testwater[]", String(well.waterTest || 0));
+        formData.append("tstm[]", well.TSTM || "N");
+        formData.append("jtf[]", String(well.JTF || 0));
+        formData.append("ftf[]", String(well.FTF || 0));
+        formData.append("fap[]", String(well.FAP || 0));
+        formData.append("gffap[]", String(well.GFFAP || 0));
+        formData.append("snd[]", String(well.SND || 0));
+      });
+    }
+
+    // Gas & water meter, comments, spcc, initgauges, etc.
+    formData.append("tbg", String(tbgPressure || 0));
+    formData.append("csg", String(csgPressure || 0));
+    formData.append("h20m", String(waterMeter || 0));
+    formData.append("h20reset", waterMeterReset || "N");
+    formData.append("h20", String(manualWater || 0));
+    formData.append("comments", comments || "");
+    formData.append("spcc", spcc || "");
+    formData.append("initgauges", initialGauges || "N");
+
+    // Additional console logs
+    console.log("Final FormData to send:", formData);
+
+    // 3) Actually POST
+    try {
+      const response = await fetch(`${baseUrl}/service_postgauge.php`, {
+        method: "POST",
+        body: formData,
+      });
+      // If the server always returns JSON, do:
+      // const result = await response.json();
+
+      // But let's be safe in case the server returns non-JSON on error:
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        // fallback to text
+        const textResp = await response.text();
+        result = {
+          status: "error",
+          message: textResp,
+        };
+      }
+
+      console.log("Server response:", result);
+
+      if (result.status === "success") {
+        alert(`Gauge Entry Submitted!\n${result.message}`);
+      } else {
+        alert(`Partial or error.\n${JSON.stringify(result)}`);
+      }
+    } catch (err) {
+      console.error("POST error:", err);
+      alert(`Submission failed: ${err.message}`);
+    }
+  };
+
+  // Define columns for the history grid
   const historyColumnDefs = useMemo(() => {
     return [
+      // Date
       {
         headerName: "Date",
-        field: "gaugeDate",
+        field: "GaugeDate",
         flex: 1,
-        valueFormatter: (params) =>
-          moment(params.value).isValid()
-            ? moment(params.value).format("MM/DD/YYYY")
-            : params.value,
+        valueFormatter: (params) => {
+          if (params.value === "Totals") return "Totals";
+          return moment(params.value, "MM/DD/YYYY").format("MM/DD/YYYY");
+        },
+        cellStyle: { textAlign: "center" },
+        sortable: true,
+        filter: true,
       },
+      // Time
       {
-        headerName: "Oil",
-        field: "oil",
+        headerName: "Time",
+        field: "GaugeTime",
         flex: 1,
-        cellStyle: { textAlign: "right" },
+        cellStyle: { textAlign: "center" },
+        sortable: true,
+        filter: true,
       },
+      // Type
       {
-        headerName: "Run",
-        field: "run",
+        headerName: "Type",
+        field: "GaugeType",
         flex: 1,
-        cellStyle: { textAlign: "right" },
+        cellStyle: { textAlign: "center" },
+        sortable: true,
+        filter: true,
+        cellRenderer: (params) => {
+          const value = params.value ? params.value.trim().toUpperCase() : "";
+          if (value === "R") return "Run Ticket";
+          if (value === "G") return "Gauge";
+          return value;
+        },
       },
+      // Tank
       {
-        headerName: "BSW",
-        field: "bsw",
+        headerName: "Tank",
+        field: "TankID",
         flex: 1,
-        cellStyle: { textAlign: "right" },
+        cellStyle: { textAlign: "center" },
+        sortable: true,
+        filter: true,
       },
+      // Gauge
       {
-        headerName: "Water",
-        field: "water",
+        headerName: "Gauge",
+        field: "Gauge",
         flex: 1,
-        cellStyle: { textAlign: "right" },
+        sortable: true,
+        filter: true,
       },
+      // Gross Bbls
       {
-        headerName: "Gas",
-        field: "gas",
+        headerName: "Gross Bbls",
+        field: "produced",
         flex: 1,
-        cellStyle: { textAlign: "right" },
+        type: "rightAligned",
+        sortable: true,
+        filter: true,
       },
-      { headerName: "Comments", field: "comment", flex: 2 },
+      // Run Bbls
+      {
+        headerName: "Run Bbls",
+        field: "runbbls",
+        flex: 1,
+        type: "rightAligned",
+        sortable: true,
+        filter: true,
+      },
+      // BS&W Draws
+      {
+        headerName: "BS&W Draws",
+        field: "drawbbls",
+        flex: 1,
+        type: "rightAligned",
+        sortable: true,
+        filter: true,
+      },
+      // Comments
+      {
+        headerName: "Comments",
+        field: "Comment",
+        flex: 1,
+        cellStyle: { textAlign: "left" },
+        sortable: true,
+        filter: true,
+      },
+      // Tbg
+      {
+        headerName: "Tbg",
+        field: "TbgPressure",
+        flex: 1,
+        type: "rightAligned",
+        sortable: true,
+        filter: true,
+      },
+      // Csg
+      {
+        headerName: "Csg",
+        field: "CsgPressure",
+        flex: 1,
+        type: "rightAligned",
+        sortable: true,
+        filter: true,
+      },
     ];
   }, []);
-
   const defaultColDef = useMemo(
     () => ({
       resizable: true,
@@ -371,28 +573,212 @@ function GaugeEntryPage() {
     []
   );
 
+  // Auto-fetch if "T" & leaseID
+  useEffect(() => {
+    if (selectedReport !== "T" || !leaseID) return;
+    fetchRecentGaugeHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedReport, leaseID]);
+
+  // Fetch data from service_testgauge.php?Rpt=T&LeaseID=xxx
+  const fetchRecentGaugeHistory = async () => {
+    try {
+      setLoadingHistory(true);
+
+      // Build base URL and query params
+      let apiUrl = `${baseUrl}/service_testgauge.php`;
+      const params = new URLSearchParams();
+
+      // The "Gauges By Tank" report
+      params.append("Rpt", "T");
+      params.append("LeaseID", leaseID);
+
+      // Example: 7 days ago -> today
+      const fromDate = moment().subtract(7, "days").format("YYYY-MM-DD");
+      const thruDate = moment().format("YYYY-MM-DD");
+
+      // Append from/thru to params
+      params.append("From", fromDate);
+      params.append("Thru", thruDate);
+
+      // Build full URL
+      apiUrl += `?${params.toString()}`;
+
+      // Fetch
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+
+      // Format for display
+      const formattedData = data.map((item) => ({
+        ...item,
+        GaugeDate: moment(item.GaugeDate).format("MM/DD/YYYY"),
+        GaugeTime: moment(item.GaugeTime, "HH:mm:ss").format("HH:mm"),
+        Gauge: `${item.GaugeFt}' ${item.GaugeIn}"`,
+      }));
+
+      setHistoryRowData(formattedData);
+      calculateTotalsForGaugesByTank(formattedData);
+
+      // Prefill from the MOST RECENT record
+      if (formattedData.length > 0) {
+        // Sort descending by date/time
+        const sorted = [...formattedData].sort(
+          (a, b) =>
+            new Date(b.GaugeDate + " " + b.GaugeTime) -
+            new Date(a.GaugeDate + " " + a.GaugeTime)
+        );
+        const mostRecent = sorted[0];
+
+        // TBG & CSG
+        setTbgPressure(parseFloat(mostRecent.TbgPressure || 0));
+        setCsgPressure(parseFloat(mostRecent.CsgPressure || 0));
+
+        // Water/Gas meters
+        if (mostRecent.WMeter) {
+          setWaterMeter(parseFloat(mostRecent.WMeter));
+        }
+        if (mostRecent.GMeter) {
+          setGasMeter(parseFloat(mostRecent.GMeter));
+        }
+
+        // Prefill Oil Tanks if matching TankID
+        if (mostRecent.TankID) {
+          const idx = oilGauges.findIndex(
+            (tank) => String(tank.tankId) === String(mostRecent.TankID)
+          );
+          if (idx >= 0) {
+            setOilGauges((prev) => {
+              const updated = [...prev];
+              updated[idx].gaugeFt = parseFloat(mostRecent.GaugeFt || 0);
+              updated[idx].gaugeIn = parseFloat(mostRecent.GaugeIn || 0);
+              // If you have colorCut, overrideBbls, etc., set them here
+              return updated;
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching recent gauge history:", error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  async function fetchGaugeRows() {
+    if (!leaseID || !gaugeDate) return;
+
+    try {
+      const params = new URLSearchParams();
+      params.set("lid", leaseID);
+      params.set("gdate", gaugeDate);
+      if (showWells) params.set("showWells", "Y"); // If you want well data
+
+      const url = `${baseUrl}/service_getgauges.php?` + params.toString();
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.status === "success") {
+        // “data.daily” has numeric GaugeID, TankID, etc.
+        // We can store them in oilGauges/waterGauges
+        // if TANKType == 'W' => water, else => oil, for example
+
+        const dailyRows = data.daily || [];
+        const wellRows = data.wellgauges || [];
+
+        // Partition dailyRows by tank type (T for oil, W for water, etc.)
+        const oil = dailyRows.filter((d) => d.TankType !== "W");
+        const water = dailyRows.filter((d) => d.TankType === "W");
+
+        // Make sure each row has numeric gaugeFt / gaugeIn for editing
+        const mappedOil = oil.map((row) => ({
+          GaugeID: row.GaugeID,
+          TankID: row.TankID,
+          gaugeFt: parseFloat(row.GaugeFt || 0),
+          gaugeIn: parseFloat(row.GaugeIn || 0),
+          overrideBbls: parseFloat(row.OverrideBbls || 0),
+          // etc.
+        }));
+        setOilGauges(mappedOil);
+
+        const mappedWater = water.map((row) => ({
+          GaugeID: row.GaugeID,
+          TankID: row.TankID,
+          gaugeFt: parseFloat(row.GaugeFt || 0),
+          gaugeIn: parseFloat(row.GaugeIn || 0),
+          // etc.
+        }));
+        setWaterGauges(mappedWater);
+
+        // Wells
+        if (showWells) {
+          const mappedWells = wellRows.map((w) => ({
+            WellGaugeId: w.WellGaugeId,
+            WellID: w.WellID,
+            wellOn: w.WellOn || "Y",
+            tbg: parseFloat(w.TbgPressure || 0),
+            csg: parseFloat(w.CsgPressure || 0),
+            oilTest: parseFloat(w.TestOil || 0),
+            gasTest: parseFloat(w.TestGas || 0),
+            waterTest: parseFloat(w.TestWater || 0),
+            // etc.
+          }));
+          setWellEntries(mappedWells);
+        }
+      } else {
+        console.error("Error from service_getgauges:", data.message);
+      }
+    } catch (err) {
+      console.error("Fetch gauge rows error:", err);
+    }
+  }
+
+  // On mount or whenever leaseID/gaugeDate changes, fetch real gauge rows
+  useEffect(() => {
+    fetchGaugeRows();
+  }, [leaseID, gaugeDate, showWells]); // or paramLeaseID if you prefer
+
+  // Calculate pinned top row totals
+  const calculateTotalsForGaugesByTank = (data) => {
+    const totals = data.reduce(
+      (acc, curr) => ({
+        GaugeDate: "Totals",
+        produced: acc.produced + (parseFloat(curr.produced) || 0),
+        runbbls: acc.runbbls + (parseFloat(curr.runbbls) || 0),
+        drawbbls: acc.drawbbls + (parseFloat(curr.drawbbls) || 0),
+        WMeter: acc.WMeter + (parseFloat(curr.WMeter) || 0),
+        waterproducedtankbbls:
+          acc.waterproducedtankbbls +
+          (parseFloat(curr.waterproducedtankbbls) || 0),
+        netwater: acc.netwater + (parseFloat(curr.netwater) || 0),
+        waterrunbbls: acc.waterrunbbls + (parseFloat(curr.waterrunbbls) || 0),
+        netgas: acc.netgas + (parseFloat(curr.netgas) || 0),
+      }),
+      {
+        GaugeDate: "",
+        produced: 0,
+        runbbls: 0,
+        drawbbls: 0,
+        WMeter: 0,
+        waterproducedtankbbls: 0,
+        netwater: 0,
+        waterrunbbls: 0,
+        netgas: 0,
+      }
+    );
+
+    // Format to fixed decimals
+    Object.keys(totals).forEach((key) => {
+      if (key !== "GaugeDate") {
+        totals[key] = parseFloat(totals[key]).toFixed(2);
+      }
+    });
+
+    setPinnedTopRowData([totals]);
+  };
+
   const onGridReady = (params) => {
     params.api.sizeColumnsToFit();
   };
-
-  useEffect(() => {
-    // Mock last 7 days
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const dateStr = moment().subtract(i, "days").format("YYYY-MM-DD");
-      days.push({
-        gaugeDate: dateStr,
-        oil: (Math.random() * 50).toFixed(2),
-        run: (Math.random() * 10).toFixed(2),
-        bsw: (Math.random() * 2).toFixed(2),
-        water: (Math.random() * 25).toFixed(2),
-        gas: (Math.random() * 300).toFixed(0),
-        comment: i === 0 ? "Most Recent" : "",
-      });
-    }
-    days.sort((a, b) => moment(b.gaugeDate) - moment(a.gaugeDate));
-    setHistoryRowData(days);
-  }, []);
 
   /*************************************************
    * 7) Validation & Submission
@@ -414,12 +800,6 @@ function GaugeEntryPage() {
       }
     }
     return true;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    alert("Form submitted (Here you’d send data to your server).");
   };
 
   const handleCancel = () => {
@@ -491,10 +871,7 @@ function GaugeEntryPage() {
     });
     setShowRunTicketModal(true);
   };
-
-  const closeRunTicketModal = () => {
-    setShowRunTicketModal(false);
-  };
+  const closeRunTicketModal = () => setShowRunTicketModal(false);
 
   const handleAddRunTicket = (e) => {
     e.preventDefault();
@@ -521,10 +898,7 @@ function GaugeEntryPage() {
     });
     setShowWaterTicketModal(true);
   };
-
-  const closeWaterTicketModal = () => {
-    setShowWaterTicketModal(false);
-  };
+  const closeWaterTicketModal = () => setShowWaterTicketModal(false);
 
   const handleAddWaterTicket = (e) => {
     e.preventDefault();
@@ -1020,7 +1394,7 @@ function GaugeEntryPage() {
               {/* Water */}
               {showWater && (
                 <div className="p-2 rounded-lg bg-[#ADD8E6]">
-                  <h4 className="font-semibold text-sm text-gray-700 mb-2">
+                  <h4 className="font-semibold text-sm text-gray-700 mb=2">
                     Water
                   </h4>
                   {showWaterTanks &&
@@ -1169,16 +1543,26 @@ function GaugeEntryPage() {
                     <table className="w-full border text-xs">
                       <thead className="bg-gray-100">
                         <tr>
-                          <th className="border p-1">Well ID</th>
-                          <th className="border p-1">On?</th>
-                          <th className="border p-1">ReasonDown</th>
+                          <th className="border p-1">Well On?</th>
+                          <th className="border p-1">Reason Down</th>
                           <th className="border p-1">Note</th>
+                          <th className="border p-1">Tbg</th>
+                          <th className="border p-1">Csg</th>
+                          <th className="border p-1">Oil Test</th>
+                          <th className="border p-1">Gas Test</th>
+                          <th className="border p-1">Water Test</th>
+                          <th className="border p-1">TSTM</th>
+                          <th className="border p-1">JTF</th>
+                          <th className="border p-1">FTF</th>
+                          <th className="border p-1">FAP</th>
+                          <th className="border p-1">GFFAP</th>
+                          <th className="border p-1">SND</th>
                         </tr>
                       </thead>
                       <tbody>
                         {wellEntries.map((w, idx) => (
                           <tr key={idx}>
-                            <td className="border p-1">{w.wellID}</td>
+                            {/* Well On? */}
                             <td className="border p-1">
                               <select
                                 className="border p-1 text-xs rounded focus:outline-blue-500"
@@ -1196,6 +1580,8 @@ function GaugeEntryPage() {
                                 <option value="N">No</option>
                               </select>
                             </td>
+
+                            {/* Reason Down */}
                             <td className="border p-1">
                               <select
                                 className="border p-1 text-xs rounded focus:outline-blue-500"
@@ -1214,6 +1600,8 @@ function GaugeEntryPage() {
                                 <option value="OT">Other</option>
                               </select>
                             </td>
+
+                            {/* Note */}
                             <td className="border p-1">
                               <input
                                 type="text"
@@ -1224,6 +1612,193 @@ function GaugeEntryPage() {
                                   setWellEntries((prev) => {
                                     const updated = [...prev];
                                     updated[idx].note = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* Tbg */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.tbg}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].tbg = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* Csg */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.csg}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].csg = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* Oil Test */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.oilTest}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].oilTest = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* Gas Test */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.gasTest}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].gasTest = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* Water Test */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.waterTest}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].waterTest = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* TSTM */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.TSTM}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].TSTM = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* JTF */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.JTF}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].JTF = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* FTF */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.FTF}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].FTF = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* FAP */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.FAP}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].FAP = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* GFFAP */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.GFFAP}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].GFFAP = val;
+                                    return updated;
+                                  });
+                                }}
+                              />
+                            </td>
+
+                            {/* SND */}
+                            <td className="border p-1">
+                              <input
+                                type="text"
+                                className="border p-1 w-16 text-xs rounded focus:outline-blue-500"
+                                value={w.SND}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWellEntries((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx].SND = val;
                                     return updated;
                                   });
                                 }}
@@ -1445,11 +2020,11 @@ function GaugeEntryPage() {
           )}
         </div>
 
-        {/* Recent Gauge History */}
+        {/* NEW: Recent Gauge History */}
         <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
           <div className="flex items-center justify-between mb-1">
             <h4 className="font-semibold text-sm text-gray-700">
-              Recent Gauge History (Last 7 Days)
+              Recent Gauge History
             </h4>
             <button
               type="button"
@@ -1469,6 +2044,7 @@ function GaugeEntryPage() {
               expandHistory ? "max-h-[1000px]" : "max-h-0"
             }`}
           >
+            {loadingHistory && <p className="text-xs">Loading...</p>}
             <div
               className="ag-theme-alpine mt-2"
               style={{ height: 300, width: "100%", overflowX: "auto" }}
@@ -1480,6 +2056,19 @@ function GaugeEntryPage() {
                 animateRows={true}
                 pagination={false}
                 onGridReady={onGridReady}
+                pinnedTopRowData={pinnedTopRowData}
+                getRowStyle={(params) =>
+                  params.node.rowPinned === "top"
+                    ? {
+                        fontWeight: "bold",
+                        backgroundColor: "#e8f5e9",
+                        color: "#000",
+                        borderBottom: "2px solid #000",
+                        fontSize: "1.1em",
+                      }
+                    : {}
+                }
+                suppressSizeToFit={true}
               />
             </div>
           </div>
