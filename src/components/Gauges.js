@@ -102,6 +102,7 @@ function GaugeEntryPage() {
       .catch((err) => console.error("Error fetching lease data:", err));
   }, [paramLeaseID]);
 
+  // Populate from leaseData (including placeholder GaugeID=0)
   useEffect(() => {
     if (!leaseData) return;
 
@@ -130,9 +131,12 @@ function GaugeEntryPage() {
       const oilTanks = leaseData.Tanks.filter((t) => t.TankType === "T");
       const waterTanks = leaseData.Tanks.filter((t) => t.TankType === "W");
 
-      const mappedOil = oilTanks.map((tank, idx) => ({
-        gaugeId: `OILTANK_${tank.TankID || idx}`,
-        tankId: tank.TankID,
+      const mappedOil = oilTanks.map((tank) => ({
+        // Store numeric GaugeID: 0 as a placeholder
+        GaugeID: 0,
+        // Also keep a "TankID" and a "tankId" if needed
+        TankID: tank.TankID, // for posting
+        tankId: tank.TankID, // for internal matching
         size: tank.Size,
         gaugeFt: 0,
         gaugeIn: 0,
@@ -144,7 +148,8 @@ function GaugeEntryPage() {
       setOilGauges(mappedOil);
 
       const mappedWater = waterTanks.map((tank, idx) => ({
-        gaugeId: `WTRTANK_${tank.TankID || idx}`,
+        GaugeID: 0,
+        TankID: tank.TankID,
         tankId: tank.TankID,
         size: tank.Size,
         gaugeFt: 0,
@@ -157,7 +162,7 @@ function GaugeEntryPage() {
     // Wells
     if (leaseData.Wells && Array.isArray(leaseData.Wells)) {
       const mappedWells = leaseData.Wells.map((w, idx) => ({
-        wellGaugeID: `WellGauge${idx}`,
+        WellGaugeId: 0, // placeholder
         wellID: w.WellID || `Well-${idx}`,
         wellOn: w.Active === "Y" ? "Y" : "N",
         reasonDown: "NU",
@@ -320,7 +325,7 @@ function GaugeEntryPage() {
   }, [gasMeter, gasMeterReset]);
 
   /*************************************************
-   * 6) Recent Gauge History - REPLACED WITH AG GRID
+   * 6) Recent Gauge History (AG Grid)
    *************************************************/
   const [expandHistory, setExpandHistory] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -330,6 +335,7 @@ function GaugeEntryPage() {
   // Hard-coded "T" for Gauges By Tank
   const [selectedReport] = useState("T");
 
+  // Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -347,7 +353,6 @@ function GaugeEntryPage() {
     formData.append("gdate", gaugeDate);
     formData.append("showWells", showWells ? "Y" : "N");
 
-    // For debugging: log to console
     console.log("Preparing to post gauge data:", {
       leaseID,
       gaugeDate,
@@ -358,22 +363,22 @@ function GaugeEntryPage() {
     oilGauges.forEach((tank, idx) => {
       console.log(`OilGauge row #${idx}`, tank);
 
-      formData.append("gaugeid[]", String(tank.GaugeID)); // numeric
+      // Note the references to "GaugeID" and "TankID" exactly match your state fields
+      formData.append("gaugeid[]", String(tank.GaugeID || ""));
       formData.append("tankid[]", String(tank.TankID || ""));
       formData.append("override[]", "N");
       formData.append("gaugeft[]", String(tank.gaugeFt || 0));
       formData.append("gaugein[]", String(tank.gaugeIn || 0));
       formData.append("overridebbls[]", String(tank.overrideBbls || 0));
-      // if you have hold-overridebbls, accumoverridebbls, etc.
       formData.append("accumoverridebbls[]", "0.00");
-      // colorcutft[], colorcutin[]
+      // If needed, also append colorcutft[], colorcutin[], etc.
     });
 
     // WATER GAUGES
     waterGauges.forEach((wt, idx) => {
       console.log(`WaterGauge row #${idx}`, wt);
 
-      formData.append("wgaugeid[]", String(wt.GaugeID)); // numeric
+      formData.append("wgaugeid[]", String(wt.GaugeID || ""));
       formData.append("wgaugeft[]", String(wt.gaugeFt || 0));
       formData.append("wgaugein[]", String(wt.gaugeIn || 0));
     });
@@ -383,7 +388,7 @@ function GaugeEntryPage() {
       wellEntries.forEach((well, idx) => {
         console.log(`Well row #${idx}`, well);
 
-        formData.append("wellgaugeid[]", String(well.WellGaugeId)); // numeric
+        formData.append("wellgaugeid[]", String(well.WellGaugeId || ""));
         formData.append("wellon[]", well.wellOn || "Y");
         formData.append("reasondown[]", well.reasonDown || "");
         formData.append("note[]", well.note || "");
@@ -411,7 +416,6 @@ function GaugeEntryPage() {
     formData.append("spcc", spcc || "");
     formData.append("initgauges", initialGauges || "N");
 
-    // Additional console logs
     console.log("Final FormData to send:", formData);
 
     // 3) Actually POST
@@ -420,10 +424,7 @@ function GaugeEntryPage() {
         method: "POST",
         body: formData,
       });
-      // If the server always returns JSON, do:
-      // const result = await response.json();
 
-      // But let's be safe in case the server returns non-JSON on error:
       let result;
       try {
         result = await response.json();
@@ -449,7 +450,7 @@ function GaugeEntryPage() {
     }
   };
 
-  // Define columns for the history grid
+  // AG Grid columns for history
   const historyColumnDefs = useMemo(() => {
     return [
       // Date
@@ -585,11 +586,8 @@ function GaugeEntryPage() {
     try {
       setLoadingHistory(true);
 
-      // Build base URL and query params
       let apiUrl = `${baseUrl}/service_testgauge.php`;
       const params = new URLSearchParams();
-
-      // The "Gauges By Tank" report
       params.append("Rpt", "T");
       params.append("LeaseID", leaseID);
 
@@ -597,18 +595,14 @@ function GaugeEntryPage() {
       const fromDate = moment().subtract(7, "days").format("YYYY-MM-DD");
       const thruDate = moment().format("YYYY-MM-DD");
 
-      // Append from/thru to params
       params.append("From", fromDate);
       params.append("Thru", thruDate);
 
-      // Build full URL
       apiUrl += `?${params.toString()}`;
 
-      // Fetch
       const response = await fetch(apiUrl);
       const data = await response.json();
 
-      // Format for display
       const formattedData = data.map((item) => ({
         ...item,
         GaugeDate: moment(item.GaugeDate).format("MM/DD/YYYY"),
@@ -621,7 +615,6 @@ function GaugeEntryPage() {
 
       // Prefill from the MOST RECENT record
       if (formattedData.length > 0) {
-        // Sort descending by date/time
         const sorted = [...formattedData].sort(
           (a, b) =>
             new Date(b.GaugeDate + " " + b.GaugeTime) -
@@ -641,21 +634,7 @@ function GaugeEntryPage() {
           setGasMeter(parseFloat(mostRecent.GMeter));
         }
 
-        // Prefill Oil Tanks if matching TankID
-        if (mostRecent.TankID) {
-          const idx = oilGauges.findIndex(
-            (tank) => String(tank.tankId) === String(mostRecent.TankID)
-          );
-          if (idx >= 0) {
-            setOilGauges((prev) => {
-              const updated = [...prev];
-              updated[idx].gaugeFt = parseFloat(mostRecent.GaugeFt || 0);
-              updated[idx].gaugeIn = parseFloat(mostRecent.GaugeIn || 0);
-              // If you have colorCut, overrideBbls, etc., set them here
-              return updated;
-            });
-          }
-        }
+        // Optionally prefill oilGauges if matching TankID, etc.
       }
     } catch (error) {
       console.error("Error fetching recent gauge history:", error);
@@ -664,65 +643,64 @@ function GaugeEntryPage() {
     }
   };
 
+  // Fetch daily gauge rows from service_getgauges.php
   async function fetchGaugeRows() {
     if (!leaseID || !gaugeDate) return;
-
     try {
       const params = new URLSearchParams();
       params.set("lid", leaseID);
       params.set("gdate", gaugeDate);
-      if (showWells) params.set("showWells", "Y"); // If you want well data
 
-      const url = `${baseUrl}/service_getgauges.php?` + params.toString();
+      const url = `${baseUrl}/service_getgauges.php?${params.toString()}`;
       const res = await fetch(url);
       const data = await res.json();
 
       if (data.status === "success") {
-        // “data.daily” has numeric GaugeID, TankID, etc.
-        // We can store them in oilGauges/waterGauges
-        // if TANKType == 'W' => water, else => oil, for example
-
         const dailyRows = data.daily || [];
-        const wellRows = data.wellgauges || [];
 
-        // Partition dailyRows by tank type (T for oil, W for water, etc.)
-        const oil = dailyRows.filter((d) => d.TankType !== "W");
-        const water = dailyRows.filter((d) => d.TankType === "W");
+        // Index them by TankID
+        const dailyByTankID = {};
+        dailyRows.forEach((row) => {
+          if (row.TankID) {
+            dailyByTankID[row.TankID] = row;
+          }
+        });
 
-        // Make sure each row has numeric gaugeFt / gaugeIn for editing
-        const mappedOil = oil.map((row) => ({
-          GaugeID: row.GaugeID,
-          TankID: row.TankID,
-          gaugeFt: parseFloat(row.GaugeFt || 0),
-          gaugeIn: parseFloat(row.GaugeIn || 0),
-          overrideBbls: parseFloat(row.OverrideBbls || 0),
-          // etc.
-        }));
-        setOilGauges(mappedOil);
+        // Override certain fields
+        setOilGauges((prev) =>
+          prev.map((oilTank) => {
+            const daily = dailyByTankID[oilTank.tankId];
+            if (!daily) return oilTank;
+            return {
+              ...oilTank,
+              // Store the real daily GaugeID
+              GaugeID: parseInt(daily.GaugeID || "0", 10),
+              gaugeFt: parseFloat(daily.GaugeFt || "0"),
+              gaugeIn: parseFloat(daily.GaugeIn || "0"),
+            };
+          })
+        );
 
-        const mappedWater = water.map((row) => ({
-          GaugeID: row.GaugeID,
-          TankID: row.TankID,
-          gaugeFt: parseFloat(row.GaugeFt || 0),
-          gaugeIn: parseFloat(row.GaugeIn || 0),
-          // etc.
-        }));
-        setWaterGauges(mappedWater);
+        setWaterGauges((prev) =>
+          prev.map((wTank) => {
+            const daily = dailyByTankID[wTank.tankId];
+            if (!daily) return wTank;
+            return {
+              ...wTank,
+              GaugeID: parseInt(daily.GaugeID || "0", 10),
+              gaugeFt: parseFloat(daily.GaugeFt || "0"),
+              gaugeIn: parseFloat(daily.GaugeIn || "0"),
+            };
+          })
+        );
 
-        // Wells
-        if (showWells) {
-          const mappedWells = wellRows.map((w) => ({
-            WellGaugeId: w.WellGaugeId,
-            WellID: w.WellID,
-            wellOn: w.WellOn || "Y",
-            tbg: parseFloat(w.TbgPressure || 0),
-            csg: parseFloat(w.CsgPressure || 0),
-            oilTest: parseFloat(w.TestOil || 0),
-            gasTest: parseFloat(w.TestGas || 0),
-            waterTest: parseFloat(w.TestWater || 0),
-            // etc.
-          }));
-          setWellEntries(mappedWells);
+        // If TbgPressure, CsgPressure, GMeter, etc. are global fields, use first row
+        if (dailyRows.length > 0) {
+          const firstRow = dailyRows[0];
+          setTbgPressure(parseFloat(firstRow.TbgPressure || "0"));
+          setCsgPressure(parseFloat(firstRow.CsgPressure || "0"));
+          setGasMeter(parseFloat(firstRow.GMeter || "0"));
+          // ...
         }
       } else {
         console.error("Error from service_getgauges:", data.message);
@@ -735,9 +713,9 @@ function GaugeEntryPage() {
   // On mount or whenever leaseID/gaugeDate changes, fetch real gauge rows
   useEffect(() => {
     fetchGaugeRows();
-  }, [leaseID, gaugeDate, showWells]); // or paramLeaseID if you prefer
+  }, [leaseID, gaugeDate, showWells]);
 
-  // Calculate pinned top row totals
+  // Summation row for AG Grid
   const calculateTotalsForGaugesByTank = (data) => {
     const totals = data.reduce(
       (acc, curr) => ({
@@ -822,7 +800,7 @@ function GaugeEntryPage() {
   const [showRunTicketModal, setShowRunTicketModal] = useState(false);
   const [showWaterTicketModal, setShowWaterTicketModal] = useState(false);
 
-  // Run Ticket
+  // Run Tickets
   const [runTickets, setRunTickets] = useState([]);
   const [newRunTicket, setNewRunTicket] = useState({
     product: "Sell Oil",
@@ -839,7 +817,7 @@ function GaugeEntryPage() {
     diffBbls: "0 bbls",
   });
 
-  // Water Ticket
+  // Water Tickets
   const [waterTickets, setWaterTickets] = useState([]);
   const [newWaterTicket, setNewWaterTicket] = useState({
     ticketId: "",
@@ -1082,7 +1060,7 @@ function GaugeEntryPage() {
 
                         {oilGauges.map((tank, idx) => (
                           <div
-                            key={tank.gaugeId}
+                            key={tank.TankID}
                             className="col-span-12 grid grid-cols-12 items-center gap-2 py-1 px-4 hover:bg-gray-50 transition-colors"
                           >
                             <div
@@ -1090,7 +1068,7 @@ function GaugeEntryPage() {
                                 useColorCut ? "col-span-3" : "col-span-4"
                               } font-medium text-gray-800`}
                             >
-                              {tank.tankId} ({tank.size})
+                              {tank.TankID} ({tank.size})
                             </div>
                             <div
                               className={`${
@@ -1400,11 +1378,11 @@ function GaugeEntryPage() {
                   {showWaterTanks &&
                     waterGauges.map((tank, idx) => (
                       <div
-                        key={tank.gaugeId}
+                        key={tank.TankID}
                         className="flex flex-wrap items-center gap-1 mb-2 text-xs p-2 bg-white rounded shadow-sm"
                       >
                         <label className="font-medium">
-                          {tank.tankId} ({tank.size})
+                          {tank.TankID} ({tank.size})
                         </label>
                         <div className="flex items-center gap-1 ml-2">
                           <label className="text-gray-500">Ft:</label>
