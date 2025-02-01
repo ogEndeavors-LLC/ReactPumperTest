@@ -14,7 +14,6 @@ import logo from "../assets/100.png";
 import moment from "moment";
 
 /* ------------------------- BREAKPOINTS ------------------------- */
-/* Adjust as desired for iPad and iPhone. 1024px typically covers iPad in portrait mode. */
 const TABLET_BREAKPOINT = "1024px";
 
 /* ------------------------- GLOBAL STYLE ------------------------- */
@@ -24,6 +23,7 @@ const GlobalStyle = createGlobalStyle`
     color: ${({ theme }) => (theme === "dark" ? "#E0E0E0" : "#333")};
     background-color: ${({ theme }) =>
       theme === "dark" ? "#121212" : "#FFFFFF"};
+    text-align: center; /* Center ALL text globally */
   }
 `;
 
@@ -118,7 +118,6 @@ const NavBarContainer = styled(animated.nav)`
   z-index: 100;
   transition: all 0.3s ease;
 
-  /* Hamburger layout up to 1024px (iPad and iPhone) */
   @media (max-width: ${TABLET_BREAKPOINT}) {
     padding: 0.5rem 1rem;
   }
@@ -158,19 +157,18 @@ const NavItemsWrapper = styled.div`
   display: flex;
   align-items: center;
 
-  /* On screens <= 1024px, position fixed for the hamburger menu */
   @media (max-width: ${TABLET_BREAKPOINT}) {
     position: fixed;
     top: 60px;
     right: 0;
-    width: 70%;
+    width: 50%; /* Further reduced from 60% to 50% */
     height: calc(100vh - 60px);
     background: ${({ theme }) =>
       theme === "dark" ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.9)"};
     backdrop-filter: blur(8px);
     flex-direction: column;
     justify-content: flex-start;
-    align-items: flex-start;
+    align-items: center; /* Center the items horizontally */
     padding: 1rem;
     box-shadow: -2px 0 15px rgba(0, 0, 0, 0.1);
     transform: ${({ isMobileMenuOpen }) =>
@@ -188,11 +186,12 @@ const NavItems = styled.div`
   position: relative;
   flex-wrap: wrap;
 
-  /* Stack vertically on screens <= 1024px */
   @media (max-width: ${TABLET_BREAKPOINT}) {
     flex-direction: column;
     width: 100%;
     margin-top: 1rem;
+    align-items: center; /* Center items in column direction */
+    text-align: center; /* Center the text of each item */
   }
 
   .material-symbols-outlined {
@@ -226,8 +225,9 @@ const NavItem = styled(animated.div)`
   @media (max-width: ${TABLET_BREAKPOINT}) {
     border-radius: 6px;
     width: 100%;
-    justify-content: flex-start;
+    justify-content: center; /* Center icon/text horizontally */
     padding: 10px 20px;
+
     &:hover {
       background-color: ${({ theme }) =>
         theme === "dark" ? "rgba(255,255,255,0.1)" : "#f5f5f5"};
@@ -243,7 +243,6 @@ const HamburgerButton = styled.button`
   cursor: pointer;
   padding: 0;
 
-  /* Show the hamburger on screens <= 1024px */
   @media (max-width: ${TABLET_BREAKPOINT}) {
     display: inline-flex;
     flex-direction: column;
@@ -310,7 +309,6 @@ const AdminButton = styled.button`
       theme === "dark" ? "#3367D6" : "#F2F2F2"};
   }
 
-  /* Hide Admin button on smaller devices. Remove if you want it to remain visible. */
   @media (max-width: 768px) {
     display: none;
   }
@@ -508,6 +506,15 @@ function Layout({ children }) {
     setProfileCardVisible(false);
   }, []);
 
+  /**
+   * Helper to navigate and close the mobile menu
+   */
+  const handleNavigate = (path) => {
+    navigate(path);
+    // Once we navigate away, close the sandwich menu
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <div
       className={
@@ -519,8 +526,8 @@ function Layout({ children }) {
       <GlobalStyle theme={theme} />
       <NavBarContainer style={navBarAnimation} theme={theme}>
         {/* Logo/Home */}
-        <Logo onClick={() => navigate("/home")} theme={theme}>
-          <HomeIcon />
+        <Logo onClick={() => handleNavigate("/home")} theme={theme}>
+          {!isMobileMenuOpen && <HomeIcon />}
           <span>
             {companyName && companyName.length > 3
               ? companyName
@@ -546,33 +553,37 @@ function Layout({ children }) {
             {userRole !== "P" && (
               <AdminButton
                 theme={theme}
-                onClick={() => navigate("/admin-panel")}
+                onClick={() => handleNavigate("/admin-panel")}
               >
                 Admin Panel
               </AdminButton>
             )}
 
             {/* Production */}
-            <NavItem onClick={() => navigate("/prod")} theme={theme}>
-              Current Production
+            <NavItem onClick={() => handleNavigate("/prod")} theme={theme}>
+              {isMobileMenuOpen ? "Production" : "Current Production"}
             </NavItem>
 
             {/* Gauge Entry */}
-            <NavItem onClick={() => navigate("/pumper")} theme={theme}>
-              Gauge Entry
+            <NavItem onClick={() => handleNavigate("/pumper")} theme={theme}>
+              {isMobileMenuOpen ? "Gauge Entry" : "Gauge Entry"}
             </NavItem>
 
             {/* Charts */}
-            <NavItem onClick={() => navigate("/Charts")} theme={theme}>
-              Charts
+            <NavItem onClick={() => handleNavigate("/Charts")} theme={theme}>
+              {isMobileMenuOpen ? "Charts" : "Charts"}
+            </NavItem>
+
+            <NavItem onClick={() => handleNavigate("/loads")} theme={theme}>
+              {isMobileMenuOpen ? "Loads" : "Loads"}
             </NavItem>
 
             {/* Inventory Dropdown */}
             <NavDropdown theme={theme}>
-              <summary>Inventory</summary>
+              <summary>{isMobileMenuOpen ? "Inventory" : "Inventory"}</summary>
               <NavDropdownItem
                 theme={theme}
-                onClick={() => navigate("/inv?type=lease")}
+                onClick={() => handleNavigate("/inv?type=lease")}
               >
                 By Lease
               </NavDropdownItem>
@@ -584,7 +595,7 @@ function Layout({ children }) {
                     .startOf("month")
                     .format("YYYY-MM-DD");
                   const thruDate = moment().format("YYYY-MM-DD");
-                  navigate(
+                  handleNavigate(
                     `/reports?Rpt=O&LeaseID=&StartDate=${startDate}&Thru=${thruDate}`
                   );
                 }}
@@ -595,24 +606,30 @@ function Layout({ children }) {
 
             {/* Reports Dropdown */}
             <NavDropdown theme={theme}>
-              <summary>Reports</summary>
+              <summary>{isMobileMenuOpen ? "Reports" : "Reports"}</summary>
               <NavDropdownItem
                 theme={theme}
-                onClick={() => navigate("/reports")}
+                onClick={() => handleNavigate("/reports")}
               >
                 By Lease
               </NavDropdownItem>
               <NavDropdownItem
                 theme={theme}
-                onClick={() => navigate("/prodSummary")}
+                onClick={() => handleNavigate("/prodSummary")}
               >
                 Production Summary
               </NavDropdownItem>
             </NavDropdown>
 
-            {/* Profile Icon */}
+            {/* Profile Icon or Text */}
             <NavItem onClick={toggleProfileCard} theme={theme}>
-              <span className="material-symbols-outlined">account_circle</span>
+              {isMobileMenuOpen ? (
+                "Profile"
+              ) : (
+                <span className="material-symbols-outlined">
+                  account_circle
+                </span>
+              )}
             </NavItem>
 
             {/* Theme Toggle */}
@@ -621,14 +638,22 @@ function Layout({ children }) {
               spinning={spinning}
               theme={theme}
             >
-              <span className="material-symbols-outlined">
-                {theme === "dark" ? "dark_mode" : "light_mode"}
-              </span>
+              {isMobileMenuOpen ? (
+                "Toggle Theme"
+              ) : (
+                <span className="material-symbols-outlined">
+                  {theme === "dark" ? "dark_mode" : "light_mode"}
+                </span>
+              )}
             </ThemeToggleButton>
 
             {/* Sign Out */}
             <NavItem onClick={handleSignOut} theme={theme}>
-              <span className="material-symbols-outlined">logout</span>
+              {isMobileMenuOpen ? (
+                "Sign Out"
+              ) : (
+                <span className="material-symbols-outlined">logout</span>
+              )}
             </NavItem>
 
             {/* Profile Card (shown when profile icon is clicked) */}

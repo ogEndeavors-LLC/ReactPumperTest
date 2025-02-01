@@ -1,25 +1,38 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FiBarChart, FiFileText, FiDroplet, FiUser } from "react-icons/fi";
+import { FiUser } from "react-icons/fi";
 import { useTheme } from "./ThemeContext";
-import { baseUrl } from "./config"; // Import baseUrl from config
+import { baseUrl } from "./config";
 import { useUser } from "./UserContext";
 
+/**
+ * This component demonstrates:
+ *  1. Fetching user details & all leases on mount.
+ *  2. Filtering leases for the current user (unless admin).
+ *  3. Reading an "activeLease" from URL query params.
+ *  4. Picking the lease that **immediately follows** the activeLease in `filteredLeases`.
+ */
 const GaugeEntry = () => {
   const { theme } = useTheme();
   const { userID } = useUser();
 
   // State for user details
   const [userDetails, setUserDetails] = useState(null);
-  // State for leases
+
+  // State for all leases from API
   const [leases, setLeases] = useState([]);
+
   // State for selected date
   const [selectedDate, setSelectedDate] = useState("");
-  // State for selected lease ID
+
+  // State for which lease is currently chosen in the dropdown
   const [selectedLeaseID, setSelectedLeaseID] = useState("");
-  // State for selected action
+
+  // State for chosen action
   const [selectedAction, setSelectedAction] = useState("Daily Gauges");
 
-  // Fetch user details
+  //////////////////////////////////////////////////////////////////////////////
+  // 1) Fetch user details
+  //////////////////////////////////////////////////////////////////////////////
   const fetchUserDetails = useCallback(async () => {
     try {
       const response = await fetch(
@@ -37,7 +50,9 @@ const GaugeEntry = () => {
     }
   }, [userID]);
 
-  // Fetch all leases
+  //////////////////////////////////////////////////////////////////////////////
+  // 2) Fetch all leases
+  //////////////////////////////////////////////////////////////////////////////
   const fetchLeases = useCallback(async () => {
     try {
       const response = await fetch(`${baseUrl}/api/leases.php`);
@@ -49,20 +64,27 @@ const GaugeEntry = () => {
     }
   }, []);
 
+  //////////////////////////////////////////////////////////////////////////////
+  // 3) useEffect to fetch data on mount & set default date
+  //////////////////////////////////////////////////////////////////////////////
   useEffect(() => {
     fetchLeases();
     fetchUserDetails();
-    const currentDate = new Date().toISOString().split("T")[0];
-    setSelectedDate(currentDate);
+    setSelectedDate(new Date().toISOString().split("T")[0]);
   }, [fetchLeases, fetchUserDetails]);
 
-  // Prepare filtered & sorted leases:
-  // - If user is admin, show all leases
-  // - Otherwise show only leases with pumperID or reliefID = userDetails.UserID
+  //////////////////////////////////////////////////////////////////////////////
+  // 4) Determine if user is Admin
+  //////////////////////////////////////////////////////////////////////////////
   const isAdmin =
     userDetails?.IsAdmin === "Y" ||
-    userDetails?.UserID?.toLowerCase() === "admin";
+    userDetails?.UserID?.toLowerCase() === "admin" ||
+    userDetails?.Role?.toLowerCase() === "a" ||
+    userDetails?.Role?.toLowerCase() === "i";
 
+  //////////////////////////////////////////////////////////////////////////////
+  // 5) Filter leases for this user (unless Admin)
+  //////////////////////////////////////////////////////////////////////////////
   const filteredLeases = leases
     .filter((lease) => {
       return (
@@ -73,9 +95,39 @@ const GaugeEntry = () => {
     })
     .sort((a, b) => a.LeaseName.localeCompare(b.LeaseName));
 
-  // Handle the GO button click
+  //////////////////////////////////////////////////////////////////////////////
+  // 6) Find the "activeLease" from URL, pick the next lease
+  //    If not found or it's the last, pick the first as fallback.
+  //////////////////////////////////////////////////////////////////////////////
+  useEffect(() => {
+    // We only do this if we haven't manually selected a lease yet
+    if (selectedLeaseID) return;
+
+    // 6A) Grab "activeLease" from the query param
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeLeaseParam = urlParams.get("activeLease") || "";
+
+    // 6B) If we have any leases
+    if (filteredLeases.length > 0) {
+      // 6C) Find the index of activeLease
+      const idx = filteredLeases.findIndex(
+        (l) => l.LeaseID === activeLeaseParam
+      );
+      if (idx >= 0 && idx < filteredLeases.length - 1) {
+        // The next lease in the array
+        setSelectedLeaseID(filteredLeases[idx + 1].LeaseID);
+      } else {
+        // Fallback: if it's the last or not found, pick the first lease
+        setSelectedLeaseID(filteredLeases[0].LeaseID);
+      }
+    }
+  }, [filteredLeases, selectedLeaseID]);
+
+  //////////////////////////////////////////////////////////////////////////////
+  // 7) Handle the GO button click
+  //    -> Navigate to new page with selectedLeaseID in query string
+  //////////////////////////////////////////////////////////////////////////////
   const handleGoClick = () => {
-    // Navigate to the next page (e.g., /GaugeEntry) with selectedLeaseID in the query string
     if (selectedLeaseID) {
       window.location.href = `/GaugeEntry?leaseid=${selectedLeaseID}`;
     } else {
@@ -83,6 +135,9 @@ const GaugeEntry = () => {
     }
   };
 
+  //////////////////////////////////////////////////////////////////////////////
+  // RENDER
+  //////////////////////////////////////////////////////////////////////////////
   return (
     <div
       className={`min-h-screen ${
@@ -96,7 +151,7 @@ const GaugeEntry = () => {
           theme === "dark" ? "bg-gray-800" : "bg-white"
         } shadow-2xl rounded-2xl p-6 sm:p-8 max-w-md w-full mt-8`}
       >
-        {/* Enhanced "Hi user, Message" section */}
+        {/* Header / greeting area */}
         <div
           className={`flex items-center justify-center mb-8 p-4 rounded-xl shadow-lg ${
             theme === "dark" ? "bg-gray-700" : "bg-gray-100"
@@ -141,6 +196,7 @@ const GaugeEntry = () => {
           </div>
         </div>
 
+        {/* Main form */}
         <div className="grid grid-cols-1 gap-6">
           {/* Gauge Date */}
           <div>

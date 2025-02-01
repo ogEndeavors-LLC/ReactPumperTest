@@ -20,6 +20,8 @@ import Inv from "./components/LeaseInventory";
 import ProductionSummary from "./components/ProductionSummary";
 import Reports from "./components/Reports";
 import Gauges from "./components/Gauges";
+import Loads from "./components/Loads";
+
 function TitleUpdater() {
   const location = useLocation();
 
@@ -65,6 +67,15 @@ function App() {
               </Layout>
             }
           />
+          <Route
+            path="/loads"
+            element={
+              <Layout>
+                <Loads />
+              </Layout>
+            }
+          />
+
           <Route
             path="/prod"
             element={
