@@ -51,7 +51,7 @@ const CurrentDataGrid = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // **Modify the API call to include URL parameters**
+      // Build the API URL + query parameters
       let apiUrl = `${baseUrl}/service_testcurrent.php`;
       const apiParams = new URLSearchParams();
       if (selectedTag) apiParams.append("Tag", selectedTag);
@@ -62,58 +62,78 @@ const CurrentDataGrid = () => {
         apiUrl += `?${apiParams.toString()}`;
       }
 
-      const response = await fetch(apiUrl);
-      const data = await response.json();
+      // We'll store the final data in this variable
+      let updatedData = [];
 
-      // **Sample entry for testing**
-      const sampleEntry = {
-        PrintLeaseName: "Sample",
-        PrintPumperID: "PUMP001",
-        PrintLeaseID: "LEASE001",
-        Purchaser: "Sample Oil Co.",
-        ReportOrder: 1,
-        RRC: "12345",
-        PropertyNum: "PROP001",
-        UIC: "UIC001",
-        Target: 100,
-        GaugeDate: new Date().toISOString().split("T")[0],
-        GaugeTime: "08:00:00",
-        Produced: "75.50",
-        RunBbls: "50.20",
-        DrawBbls: "25.30",
-        WaterTotal: "10.50",
-        WaterInjectedTotal: "5.20",
-        Gas: "1000.00",
-        OnHand: "150.80",
-        csg: "500.00",
-        tbg: "300.00",
-        PriorCsg: "500.00",
-        PriorTbg: "300.00",
-        FlowLinePressure: "200.00",
-        McfAccum: "5000.00",
-        HoursOn: "22.00",
-        WaterMeter: "1000.00",
-        MeterReset: "0",
-        InitialGauge: "1",
-        SPCC: "Yes",
-        gaugecomments: "This is a test comment.",
-        ImageCount: 3,
-        imageUrl: sampleImage,
-        PriorProduced: "70.00",
-        PriorGas: "950.00",
-        PriorWaterTotal: "9.50",
-        PriorWaterInjectedTotal: "4.80",
-        WaterHauledBbls: "8.00",
-      };
+      // Check for online/offline
+      if (navigator.onLine) {
+        // 1. Fetch data from the API
+        const response = await fetch(apiUrl);
+        const data = await response.json();
 
-      // **Convert numeric strings to fixed decimals**
-      Object.keys(sampleEntry).forEach((key) => {
-        if (!isNaN(sampleEntry[key])) {
-          sampleEntry[key] = parseFloat(sampleEntry[key]).toFixed(2);
-        }
-      });
+        // 2. Construct a sample entry
+        const sampleEntry = {
+          PrintLeaseName: "Sample",
+          PrintPumperID: "PUMP001",
+          PrintLeaseID: "LEASE001",
+          Purchaser: "Sample Oil Co.",
+          ReportOrder: 1,
+          RRC: "12345",
+          PropertyNum: "PROP001",
+          UIC: "UIC001",
+          Target: 100,
+          GaugeDate: new Date().toISOString().split("T")[0],
+          GaugeTime: "08:00:00",
+          Produced: "75.50",
+          RunBbls: "50.20",
+          DrawBbls: "25.30",
+          WaterTotal: "10.50",
+          WaterInjectedTotal: "5.20",
+          Gas: "1000.00",
+          OnHand: "150.80",
+          csg: "500.00",
+          tbg: "300.00",
+          PriorCsg: "500.00",
+          PriorTbg: "300.00",
+          FlowLinePressure: "200.00",
+          McfAccum: "5000.00",
+          HoursOn: "22.00",
+          WaterMeter: "1000.00",
+          MeterReset: "0",
+          InitialGauge: "1",
+          SPCC: "Yes",
+          gaugecomments: "This is a test comment.",
+          ImageCount: 3,
+          imageUrl: sampleImage,
+          PriorProduced: "70.00",
+          PriorGas: "950.00",
+          PriorWaterTotal: "9.50",
+          PriorWaterInjectedTotal: "4.80",
+          WaterHauledBbls: "8.00",
+        };
 
-      const updatedData = [sampleEntry, ...data];
+        // 3. Convert numeric strings to fixed decimals
+        Object.keys(sampleEntry).forEach((key) => {
+          if (!isNaN(sampleEntry[key])) {
+            sampleEntry[key] = parseFloat(sampleEntry[key]).toFixed(2);
+          }
+        });
+
+        // 4. Combine sample entry with the fetched data
+        updatedData = [sampleEntry, ...data];
+
+        // 5. Store in localStorage for offline use
+        localStorage.setItem("serviceData", JSON.stringify(updatedData));
+      } else {
+        // 1. If offline, retrieve data from localStorage
+        const storedData =
+          JSON.parse(localStorage.getItem("serviceData")) || [];
+
+        // 2. Use what we have in localStorage
+        updatedData = storedData;
+      }
+
+      // Use updatedData for the rest of your state updates
       setRowData(updatedData);
       setFilteredData(updatedData);
       calculateTotal(updatedData);

@@ -27,6 +27,7 @@ function SignInPage() {
   const [userID, setUserID] = useState("");
   const [token, setToken] = useState("");
 
+  // Animation for the sign-in form
   const formAnimation = useSpring({
     opacity: 1,
     transform: "translateY(0)",
@@ -34,6 +35,7 @@ function SignInPage() {
     config: { mass: 1, tension: 200, friction: 20 },
   });
 
+  // Extract subdomain on mount
   useEffect(() => {
     const extractSubdomain = () => {
       const hostname = window.location.hostname;
@@ -49,6 +51,7 @@ function SignInPage() {
     extractSubdomain();
   }, []);
 
+  // Handle forgot password
   const handleForgotPassword = async () => {
     if (username.trim() === "") {
       setError("Please Enter Username");
@@ -73,10 +76,11 @@ function SignInPage() {
       }
     } catch (error) {
       setError("An error occurred while sending password reset email.");
-      setSuccessMessage(""); // Clear any previous success message
+      setSuccessMessage("");
     }
   };
 
+  // Handle creating a new user with Google
   const handleCreateNewUser = async () => {
     try {
       const response = await fetch(`${baseUrl}/api/google_login.php`, {
@@ -90,10 +94,35 @@ function SignInPage() {
       const data = await response.json();
       if (data.success) {
         const { user, companyName } = data;
-        setUser(user.Role, user.UserID, companyName);
-        localStorage.setItem("userRole", user.Role);
-        localStorage.setItem("userID", user.UserID);
-        localStorage.setItem("companyName", companyName);
+
+        /*
+          Below we pass user.Email and user.Phone into setUser
+          so it’s stored in context and localStorage.
+          Note that we do not have a 'jobRole' field in the API,
+          so we’re passing "" (empty string) for that argument.
+        */
+        setUser(
+          user.Role,
+          user.UserID,
+          companyName,
+          "", // jobRole (if you have it, pass it here)
+          user.Email,
+          user.Phone
+        );
+
+        // If you also want them in localStorage credentials (offline sign-in):
+        // localStorage.setItem(
+        //   "credentials",
+        //   JSON.stringify({
+        //     username: user.UserID,
+        //     password: password, // or hash if you prefer
+        //     role: user.Role,
+        //     userID: user.UserID,
+        //     companyName,
+        //     email: user.Email,
+        //     phone: user.Phone,
+        //   })
+        // );
 
         navigate("/dashboard");
       } else {
@@ -106,25 +135,28 @@ function SignInPage() {
     setShowPrompt(false);
   };
 
+  // Simple hash function for offline sign-in
   function hashPassword(password) {
-    // Simplified hash function; replace with a stronger algorithm in production
     let hash = 0,
       i,
       chr;
     for (i = 0; i < password.length; i++) {
       chr = password.charCodeAt(i);
       hash = (hash << 5) - hash + chr;
-      hash |= 0; // Convert to 32-bit integer
+      hash |= 0;
     }
     return hash.toString();
   }
 
+  // Main sign-in handler
   async function handleSignIn(e) {
     e.preventDefault();
     try {
       if (!navigator.onLine) {
+        // If user is offline, attempt offline sign-in
         handleOfflineSignIn(e);
       } else {
+        // Online: make API call
         const response = await fetch(`${baseUrl}/api/login_api.php`, {
           method: "POST",
           headers: {
@@ -133,14 +165,32 @@ function SignInPage() {
           body: JSON.stringify({ username, password }),
         });
         const data = await response.json();
+
+        /*
+          API response structure assumed:
+          {
+            success: true/false,
+            message: "...",
+            user: {
+              UserID, Role, Email, Phone, ...
+            },
+            companyName
+          }
+        */
         const { success, message, user, companyName } = data;
+
         if (success) {
-          setUser(user.Role, user.UserID, companyName);
+          // Pass Email and Phone to setUser
+          setUser(
+            user.Role,
+            user.UserID,
+            companyName,
+            "", // jobRole (if present, pass user.JobRole)
+            user.Email,
+            user.Phone
+          );
 
-          localStorage.setItem("userRole", user.Role);
-          localStorage.setItem("userID", user.UserID);
-          localStorage.setItem("companyName", companyName);
-
+          // Also store in localStorage for offline sign-in
           localStorage.setItem(
             "credentials",
             JSON.stringify({
@@ -149,6 +199,8 @@ function SignInPage() {
               role: user.Role,
               userID: user.UserID,
               companyName: companyName,
+              email: user.Email,
+              phone: user.Phone,
             })
           );
 
@@ -166,6 +218,7 @@ function SignInPage() {
     }
   }
 
+  // Handle offline sign-in using hashed credentials in localStorage
   function handleOfflineSignIn() {
     const storedCredentials = JSON.parse(localStorage.getItem("credentials"));
     if (storedCredentials) {
@@ -175,6 +228,8 @@ function SignInPage() {
         role,
         userID,
         companyName,
+        email,
+        phone,
       } = storedCredentials;
       const enteredPasswordHash = hashPassword(password);
 
@@ -182,10 +237,7 @@ function SignInPage() {
         username === storedUsername &&
         enteredPasswordHash === storedPasswordHash
       ) {
-        setUser(role, userID, companyName);
-        localStorage.setItem("userRole", role);
-        localStorage.setItem("userID", userID);
-        localStorage.setItem("companyName", companyName);
+        setUser(role, userID, companyName, "", email, phone);
 
         if (role === "P") {
           navigate("/pumper");
@@ -200,6 +252,7 @@ function SignInPage() {
     }
   }
 
+  // Google Login success
   const handleGoogleLoginSuccess = (response) => {
     const token = response.credential;
 
@@ -214,11 +267,18 @@ function SignInPage() {
       .then((data) => {
         if (data.success) {
           const { user, companyName } = data;
-          setUser(user.Role, user.UserID, companyName);
-          localStorage.setItem("userRole", user.Role);
-          localStorage.setItem("userID", user.UserID);
-          localStorage.setItem("companyName", companyName);
 
+          // Set user in context and localStorage
+          setUser(
+            user.Role,
+            user.UserID,
+            companyName,
+            "", // jobRole if available
+            user.Email,
+            user.Phone
+          );
+
+          // If role is 'P', navigate to pumper
           if (user.Role === "P") {
             navigate("/pumper");
           } else {
@@ -231,11 +291,12 @@ function SignInPage() {
           setError(data.message);
         }
       })
-      .catch((error) => {
+      .catch(() => {
         setError("An error occurred during Google Sign-In.");
       });
   };
 
+  // For existing user linking Google account
   const handleExistingUserSubmit = () => {
     fetch(`${baseUrl}/api/google_login.php`, {
       method: "POST",
@@ -248,10 +309,14 @@ function SignInPage() {
       .then((data) => {
         if (data.success) {
           const { user, companyName } = data;
-          setUser(user.Role, user.UserID, companyName);
-          localStorage.setItem("userRole", user.Role);
-          localStorage.setItem("userID", user.UserID);
-          localStorage.setItem("companyName", companyName);
+          setUser(
+            user.Role,
+            user.UserID,
+            companyName,
+            "", // jobRole
+            user.Email,
+            user.Phone
+          );
 
           if (user.Role === "P") {
             navigate("/pumper");
@@ -262,13 +327,14 @@ function SignInPage() {
           setError("Google Sign-In failed.");
         }
       })
-      .catch((error) => {
+      .catch(() => {
         setError("An error occurred during Google Sign-In.");
       });
 
     setShowPrompt(false);
   };
 
+  // Google Login error
   const handleGoogleLoginError = () => {
     setError("Google Sign-In failed.");
   };

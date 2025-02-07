@@ -25,10 +25,15 @@ function GaugeEntryPage() {
   const [manualWaterLabel2, setManualWaterLabel2] = useState("bbls");
   const navigate = useNavigate();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const { user, companyName } = useUser();
+  const { companyName } = useUser();
+  const [tanks, setTanks] = useState([]);
 
+  const [tankID, setTankID] = useState("");
   const [showLoads, setShowLoads] = useState(false);
-  const [purchaserLoads, setPurchaserLoads] = useState([]); // We'll store all purchaserloads here
+  const [purchaserLoads, setPurchaserLoads] = useState([]);
+  const [expandPurchaser, setExpandPurchaser] = useState(false);
+  const [lastUser, setLastUser] = useState("");
+  const [lastUpdateDate, setLastUpdateDate] = useState("");
 
   useEffect(() => {
     function handleOnline() {
@@ -49,7 +54,6 @@ function GaugeEntryPage() {
 
   // Example: fetch client-level settings once
   useEffect(() => {
-    // Only run if we actually have a non-empty companyName
     if (!companyName) return;
 
     fetch(`${baseUrl}/api/clientDetails.php?company=${companyName}`)
@@ -63,26 +67,21 @@ function GaugeEntryPage() {
           setShowWells(clientInfo.ShowWells === "Y");
           setUseColorCut(clientInfo.UseColorCut === "Y");
           setUseImages(clientInfo.UseImages === "Y");
+          setPurchaserPhone(data[0].purchasers[0].DispatchPhone);
+          setPurchaserEmail(data[0].purchasers[0].OperatorEmail);
 
-          // Show Loads?
           if (clientInfo.ShowLoads === "Y") {
             setShowLoads(true);
           }
-
-          // If ShowPOC is "N", hide POC
           if (clientInfo.ShowPOC === "N") {
             setShowPOC(false);
           }
-
-          // Water labels
           if (clientInfo.ManualWaterLabel) {
             setManualWaterLabel(clientInfo.ManualWaterLabel);
           }
           if (clientInfo.ManualWaterLabel2) {
             setManualWaterLabel2(clientInfo.ManualWaterLabel2);
           }
-
-          // If the API returns purchaserloads in the same object:
           if (clientInfo.purchaserloads) {
             setPurchaserLoads(clientInfo.purchaserloads);
           }
@@ -90,6 +89,7 @@ function GaugeEntryPage() {
       })
       .catch((err) => console.error("Error fetching client details:", err));
   }, [companyName]);
+
   /*************************************************
    * 1) Read URL parameter: leaseid=XXXX
    *************************************************/
@@ -130,7 +130,6 @@ function GaugeEntryPage() {
 
   useEffect(() => {
     if (!paramLeaseID) return;
-    // Suppose this is your standard lease-level fetch
     const url = `${baseUrl}/api/leases.php?leaseid=${paramLeaseID}`;
     fetch(url)
       .then((res) => res.json())
@@ -142,31 +141,30 @@ function GaugeEntryPage() {
       .catch((err) => console.error("Error fetching lease data:", err));
   }, [paramLeaseID]);
 
-  // Populate from leaseData (including placeholder GaugeID=0)
+  // Populate from leaseData
   useEffect(() => {
     if (!leaseData) return;
 
-    // Populate states from leaseData
+    // You can optionally do something with user, role, username, userphone here:
+    console.log("User context data:", { user, role, username, userphone });
+
+    setTankID(leaseData.Tanks[0]?.TankID || "");
+    setTanks(leaseData.Tanks || "");
+
+    console.log(tanks);
     setLeaseID(leaseData.LeaseID || "");
     setLeaseName(leaseData.LeaseName || "");
     setPumper(leaseData.PumperID || "");
-    setPumperPhone("325-698-0200"); // placeholder
-    setPumperEmail("pumper@example.com"); // placeholder
-
     setPurchaserID(leaseData.Purchaser || "");
     setPurchaser(leaseData.Purchaser || "");
-    setPurchaserPhone("555-8888"); // placeholder
-    setPurchaserEmail("dispatch@transoiltx.com"); // placeholder
     setPurchaserLeaseNo(leaseData.PurchaserLeaseNo || "");
 
-    // Show flags
     setShowOil(leaseData.ShowOil === "Y");
     setShowWater(leaseData.ShowWater === "Y");
     setShowGas(leaseData.ShowGas === "Y");
     setHasGasMeter(leaseData.GasMeter === "Y");
     setHasWaterMeter(leaseData.WaterMeter === "Y");
 
-    // Tanks
     if (leaseData.Tanks && Array.isArray(leaseData.Tanks)) {
       const oilTanks = leaseData.Tanks.filter((t) => t.TankType === "T");
       const waterTanks = leaseData.Tanks.filter((t) => t.TankType === "W");
@@ -197,10 +195,9 @@ function GaugeEntryPage() {
       setWaterGauges(mappedWater);
     }
 
-    // Wells
     if (leaseData.Wells && Array.isArray(leaseData.Wells)) {
       const mappedWells = leaseData.Wells.map((w, idx) => ({
-        WellGaugeId: 0, // placeholder
+        WellGaugeId: 0,
         wellID: w.WellID || `Well-${idx}`,
         wellOn: w.Active === "Y" ? "Y" : "N",
         reasonDown: "NU",
@@ -224,31 +221,30 @@ function GaugeEntryPage() {
   /*************************************************
    * 3) Standard user session / date / role, etc.
    *************************************************/
-  const [userSession] = useState({
-    user: "demoUser",
-    role: "A",
-    username: "demoUsername",
-    userphone: "555-1234",
-  });
-  const [role] = useState(userSession.role);
+  const { userID, userRole, userEmail, userPhone } = useUser();
+  const user = userID;
+  const role = userRole;
+  const username = userEmail;
+  const userphone = userPhone;
+
+  // Rename them locally to match your existing variable names:
 
   // We'll assume "Gauge Date" as a placeholder
   const [gaugeDate] = useState(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0"); // Months are 0-based
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
     const dd = String(today.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   });
 
-  // "src" logic
   const [src] = useState("-");
   const [srcFrom] = useState("-1");
   const [srcThru] = useState("-1");
 
   // Additional states
   const [expandWells, setExpandWells] = useState(false);
-  const [showWaterTanks] = useState(true); // If the lease uses water tanks
+  const [showWaterTanks] = useState(true);
   const [showMcf, setShowMcf] = useState(true);
   const [showMcfAccum, setShowMcfAccum] = useState(true);
 
@@ -329,7 +325,7 @@ function GaugeEntryPage() {
     setOilOnHand(netOilBbls);
     setColorCutOnHand(totalColorCutBbls);
 
-    // placeholders
+    // placeholders for example
     setSoldOil(10.0);
     setDrawBbls(1.5);
   }, [oilGauges, useColorCut]);
@@ -352,15 +348,30 @@ function GaugeEntryPage() {
     setWaterHauledBbls(10);
   }, [waterGauges]);
 
-  // Metered Water
   useEffect(() => {
     setMeteredWater(waterMeter);
   }, [waterMeter, waterMeterReset]);
 
-  // Metered Gas
   useEffect(() => {
     setMeteredGas(gasMeter);
   }, [gasMeter, gasMeterReset]);
+  function useWindowWidth() {
+    const [windowWidth, setWindowWidth] = useState(
+      typeof window !== "undefined" ? window.innerWidth : 9999
+    );
+
+    useEffect(() => {
+      function handleResize() {
+        setWindowWidth(window.innerWidth);
+      }
+      window.addEventListener("resize", handleResize);
+      return () => {
+        window.removeEventListener("resize", handleResize);
+      };
+    }, []);
+
+    return windowWidth;
+  }
 
   /*************************************************
    * 6) Recent Gauge History (AG Grid)
@@ -369,12 +380,13 @@ function GaugeEntryPage() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyRowData, setHistoryRowData] = useState([]);
   const [pinnedTopRowData, setPinnedTopRowData] = useState([]);
+  const windowWidth = useWindowWidth();
+  const isNarrow = windowWidth <= 850;
 
   // Hard-coded "T" for Gauges By Tank
   const [selectedReport] = useState("T");
 
-  // Submit Handler for the daily gauge itself
-  // Inside your GaugeEntryPage component:
+  // Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -383,13 +395,16 @@ function GaugeEntryPage() {
       return;
     }
 
-    // 1) Create a URLSearchParams object
+    // Build POST params
     const params = new URLSearchParams();
 
-    // Basic fields
+    // Required gauge data
     params.append("lid", leaseID);
     params.append("gdate", gaugeDate);
     params.append("showWells", showWells ? "Y" : "N");
+
+    // Pass the user as LogUserID
+    params.append("LogUserID", user || "UnknownUser");
 
     // Oil gauges
     oilGauges.forEach((tank) => {
@@ -440,7 +455,6 @@ function GaugeEntryPage() {
     params.append("spcc", spcc || "");
     params.append("initgauges", initialGauges);
 
-    // 2) POST using params.toString()
     try {
       const response = await fetch(`${baseUrl}/service_postgauge.php`, {
         method: "POST",
@@ -450,31 +464,38 @@ function GaugeEntryPage() {
         body: params.toString(),
       });
 
-      // If the Service Worker returns 202, it usually means offline (queued) mode
+      // If the Service Worker returns 202, it usually means offline (queued)
       if (response.status === 202) {
         console.log("Request accepted (202) - likely offline and queued.");
-        // Immediately navigate since the request is queued
         navigate(`/pumper?activeLease=${leaseID}`);
-        return; // Short-circuit here so we don't parse result
+        return;
       }
 
-      // Otherwise, parse the JSON (or fallback to text)
       let result;
       try {
         result = await response.json();
       } catch (parseError) {
-        // If JSON parse fails, try text
         const textResp = await response.text();
         result = { status: "error", message: textResp };
       }
 
       console.log("Server response (Gauge):", result);
 
+      // Handle known foreign key error if it appears
+      if (
+        result.message &&
+        result.message.includes("Cannot add or update a child row")
+      ) {
+        alert(
+          "The selected TankID is not recognized by the database (foreign key constraint). " +
+            "Please use a valid TankID for this Lease."
+        );
+        return;
+      }
+
       if (result.status === "success") {
-        // Navigate on success
         navigate(`/pumper?activeLease=${leaseID}`);
       } else {
-        // Handle partial or error
         alert(`Partial or error.\n${JSON.stringify(result)}`);
       }
     } catch (err) {
@@ -483,7 +504,7 @@ function GaugeEntryPage() {
     }
   };
 
-  // AG Grid columns for history
+  // AG Grid columns
   const historyColumnDefs = useMemo(() => {
     return [
       {
@@ -601,10 +622,8 @@ function GaugeEntryPage() {
   useEffect(() => {
     if (selectedReport !== "T" || !leaseID) return;
     fetchRecentGaugeHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedReport, leaseID]);
 
-  // Fetch data from service_testgauge.php?Rpt=T&LeaseID=xxx
   const fetchRecentGaugeHistory = async () => {
     try {
       setLoadingHistory(true);
@@ -613,7 +632,6 @@ function GaugeEntryPage() {
       params.append("Rpt", "T");
       params.append("LeaseID", leaseID);
 
-      // Example: 7 days ago -> today
       const fromDate = moment().subtract(7, "days").format("YYYY-MM-DD");
       const thruDate = moment().format("YYYY-MM-DD");
       params.append("From", fromDate);
@@ -658,10 +676,47 @@ function GaugeEntryPage() {
       setLoadingHistory(false);
     }
   };
+  // 1) Create a helper to format your date-time string
+  function formatDateTime(dateTimeStr) {
+    if (!dateTimeStr) return "";
 
-  // Fetch daily gauge rows from service_getgauges.php
+    // Replace the space with "T" so it's a valid ISO8601 date-time for the Date constructor
+    // e.g. "2025-02-06 14:21:18" => "2025-02-06T14:21:18"
+    const isoString = dateTimeStr.replace(" ", "T");
+
+    // Parse into a Date object
+    const dateObj = new Date(isoString);
+
+    // If parsing fails (invalid date), just return the raw string or handle error
+    if (isNaN(dateObj.getTime())) {
+      return dateTimeStr;
+    }
+
+    // Split out the date part in "MM/DD/YYYY" format
+    const datePart = dateObj.toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+    });
+
+    // Split out the time part in "h:mm:ss am/pm" format (lowercase "am/pm")
+    const timePart = dateObj
+      .toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      })
+      .toLowerCase();
+
+    // Combine them (remove comma if you prefer a single space)
+    return `${datePart} ${timePart}`;
+  }
+
+  // 2) Use this helper inside your fetchGaugeRows logic
   async function fetchGaugeRows() {
     if (!leaseID || !gaugeDate) return;
+
     try {
       const params = new URLSearchParams();
       params.set("lid", leaseID);
@@ -673,8 +728,22 @@ function GaugeEntryPage() {
 
       if (data.status === "success") {
         const dailyRows = data.daily || [];
+        const recentComment = data.recentComment || "";
+        const recentLogUserID = data.recentLogUserID || "";
+        const recentLogDateTime = data.recentLogDateTime || "";
 
-        // Index them by TankID
+        // Update comment
+        setComments(recentComment);
+
+        // -------------- Format the LogDateTime --------------
+        const formattedLogDateTime = formatDateTime(recentLogDateTime);
+
+        // Set your "lastUser" and "lastUpdateDate" states
+        setLastUser(recentLogUserID);
+        setLastUpdateDate(formattedLogDateTime);
+
+        // ...the rest of your logic for updating oil/water gauges...
+        // (unchanged code below)
         const dailyByTankID = {};
         dailyRows.forEach((row) => {
           if (row.TankID) {
@@ -682,7 +751,6 @@ function GaugeEntryPage() {
           }
         });
 
-        // Override certain fields
         setOilGauges((prev) =>
           prev.map((oilTank) => {
             const daily = dailyByTankID[oilTank.tankId];
@@ -709,13 +777,12 @@ function GaugeEntryPage() {
           })
         );
 
-        // If TbgPressure, CsgPressure, GMeter, etc. are global fields, use first row
+        // If TbgPressure, CsgPressure, GMeter, etc. are global fields, use the first row
         if (dailyRows.length > 0) {
           const firstRow = dailyRows[0];
           setTbgPressure(parseFloat(firstRow.TbgPressure || "0"));
           setCsgPressure(parseFloat(firstRow.CsgPressure || "0"));
           setGasMeter(parseFloat(firstRow.GMeter || "0"));
-          // ...
         }
       } else {
         console.error("Error from service_getgauges:", data.message);
@@ -725,12 +792,10 @@ function GaugeEntryPage() {
     }
   }
 
-  // On mount or whenever leaseID/gaugeDate changes, fetch real gauge rows
   useEffect(() => {
     fetchGaugeRows();
   }, [leaseID, gaugeDate, showWells]);
 
-  // Summation row for AG Grid
   const calculateTotalsForGaugesByTank = (data) => {
     const totals = data.reduce(
       (acc, curr) => ({
@@ -759,7 +824,6 @@ function GaugeEntryPage() {
       }
     );
 
-    // Format to fixed decimals
     Object.keys(totals).forEach((key) => {
       if (key !== "GaugeDate") {
         totals[key] = parseFloat(totals[key]).toFixed(2);
@@ -815,11 +879,9 @@ function GaugeEntryPage() {
   const [showRunTicketModal, setShowRunTicketModal] = useState(false);
   const [showWaterTicketModal, setShowWaterTicketModal] = useState(false);
 
-  // We track runTickets & waterTickets locally, but also send them to the server
   const [runTickets, setRunTickets] = useState([]);
   const [waterTickets, setWaterTickets] = useState([]);
 
-  // If editing an existing ticket, store index & type
   const [editingRunTicketIndex, setEditingRunTicketIndex] = useState(null);
   const [editingWaterTicketIndex, setEditingWaterTicketIndex] = useState(null);
 
@@ -836,7 +898,7 @@ function GaugeEntryPage() {
     gaugetype: "B",
     comments: "",
     tickettype: "S",
-    tankid: "TANK1",
+    tankid: tankID, // Notice here: "GAS" must exist in your Tanks table if referencing foreign key
     opengaugeft: 0,
     opengaugein: 0,
     closegaugeft: 0,
@@ -847,11 +909,9 @@ function GaugeEntryPage() {
     temp: 2,
     bsw: 2,
     image_upload: "",
-    // Additional fields for UI
     runTicketNumber: 999,
     disposition: "",
-    // For clarity in the UI:
-    ticketId: "", // user’s textual run-ticket ID
+    ticketId: "",
   });
 
   const [newWaterTicket, setNewWaterTicket] = useState({
@@ -878,21 +938,18 @@ function GaugeEntryPage() {
     temp: 2,
     bsw: 2,
     image_upload: "",
-    // Additional fields for UI
-    ticketId: "", // water ticket ID
+    ticketId: "",
     diffInches: "0 in",
     diffBbls: "0 bbls",
   });
 
-  // Helpers to open/close modals
+  // Helpers
   const openRunTicketModal = (existingIndex = null) => {
-    // If editing existing run ticket
     if (existingIndex !== null) {
       const existing = runTickets[existingIndex];
       setNewRunTicket({ ...existing });
       setEditingRunTicketIndex(existingIndex);
     } else {
-      // brand new
       setNewRunTicket((prev) => ({
         ...prev,
         lid: leaseID,
@@ -901,7 +958,7 @@ function GaugeEntryPage() {
         ticketId: "",
         gaugeid1: "-1",
         gaugeid2: "-1",
-        tankid: "GAS",
+        tankid: tankID,
         opengaugeft: 0,
         opengaugein: 0,
         closegaugeft: 0,
@@ -915,18 +972,17 @@ function GaugeEntryPage() {
     setShowRunTicketModal(true);
   };
   const closeRunTicketModal = () => setShowRunTicketModal(false);
+
   const loadsForThisPurchaser = useMemo(() => {
     return purchaserLoads.filter((l) => l.PurchaserID === purchaserID);
   }, [purchaserLoads, purchaserID]);
 
-  // Let's do a quick status aggregator. We treat "Generated" as "Pending", etc.
   const [pendingCount, dispatchedCount, pickedUpCount, rejectedCount] =
     useMemo(() => {
       let pending = 0;
       let dispatched = 0;
       let pickedUp = 0;
       let rejected = 0;
-
       loadsForThisPurchaser.forEach((ld) => {
         const status = (ld.LoadStatus || "").toLowerCase();
         if (status.includes("generated")) pending++;
@@ -934,21 +990,17 @@ function GaugeEntryPage() {
         else if (status.includes("picked")) pickedUp++;
         else if (status.includes("reject")) rejected++;
       });
-
       return [pending, dispatched, pickedUp, rejected];
     }, [loadsForThisPurchaser]);
 
-  // We'll pick "now" or a fixed date for the "as of" text:
   const loadsAsOfDateTime = moment().format("MM/DD/YY hh:mm a");
 
   const openWaterTicketModal = (existingIndex = null) => {
-    // If editing existing water ticket
     if (existingIndex !== null) {
       const existing = waterTickets[existingIndex];
       setNewWaterTicket({ ...existing });
       setEditingWaterTicketIndex(existingIndex);
     } else {
-      // brand new
       setNewWaterTicket((prev) => ({
         ...prev,
         lid: leaseID,
@@ -970,24 +1022,22 @@ function GaugeEntryPage() {
   const closeWaterTicketModal = () => setShowWaterTicketModal(false);
 
   /*************************************************
-   * 8A) Post (Add or Update) a Run Ticket (Example)
+   * 8A) Post (Add or Update) a Run Ticket
    *************************************************/
   const handleRunTicketSave = async (e) => {
     e.preventDefault();
 
-    // Minimal validation
+    // If comments is empty or all whitespace, use "placeholder"
     if (!newRunTicket.comments || !newRunTicket.comments.trim()) {
-      alert(
-        "Ticket # Required (the server expects 'comments' to be non-empty)."
-      );
-      return;
+      newRunTicket.comments = "placeholder";
     }
+
+    // Still enforce that gaugedate can't be null
     if (!newRunTicket.gaugedate) {
       alert("GaugeDate is required (cannot be null).");
       return;
     }
 
-    // Let's do x-www-form-urlencoded here too, for consistency:
     const urlParams = new URLSearchParams();
     urlParams.append("comments", newRunTicket.comments.trim());
     urlParams.append("gaugedate", newRunTicket.gaugedate);
@@ -999,7 +1049,7 @@ function GaugeEntryPage() {
     urlParams.append("lact", newRunTicket.lact || "N");
     urlParams.append("gaugeid1", newRunTicket.gaugeid1 || "-1");
     urlParams.append("gaugeid2", newRunTicket.gaugeid2 || "-1");
-    urlParams.append("tankid", newRunTicket.tankid || "TANK1");
+    urlParams.append("tankid", newRunTicket.tankid || tankID);
     urlParams.append("imagefilename", newRunTicket.imagefilename || "");
     urlParams.append("opengaugeft", newRunTicket.opengaugeft ?? 0);
     urlParams.append("opengaugein", newRunTicket.opengaugein ?? 0);
@@ -1023,10 +1073,8 @@ function GaugeEntryPage() {
       const textResp = await resp.text();
       let result;
       try {
-        // Attempt to parse JSON
         result = JSON.parse(textResp);
       } catch (err) {
-        // fallback if not valid JSON
         result = {
           status: "error",
           message: textResp,
@@ -1035,12 +1083,23 @@ function GaugeEntryPage() {
 
       console.log("RunTicket Save response:", result);
 
+      // If the server complains about the foreign key
+      if (
+        result.message &&
+        result.message.includes("Cannot add or update a child row")
+      ) {
+        alert(
+          "Foreign key constraint failed: Please ensure this TankID exists " +
+            "for your Lease on the server."
+        );
+        return;
+      }
+
       if (result.status !== "success") {
         alert("Error saving the run ticket: " + result.message);
         return;
       }
 
-      // If successful, update local state
       if (editingRunTicketIndex !== null) {
         setRunTickets((prev) => {
           const copy = [...prev];
@@ -1050,7 +1109,6 @@ function GaugeEntryPage() {
       } else {
         setRunTickets((prev) => [...prev, { ...newRunTicket }]);
       }
-
       closeRunTicketModal();
     } catch (err) {
       console.error("RunTicket Save error:", err);
@@ -1059,12 +1117,11 @@ function GaugeEntryPage() {
   };
 
   /*************************************************
-   * 8B) Post (Add or Update) a Water Ticket (Example)
+   * 8B) Post (Add or Update) a Water Ticket
    *************************************************/
   const handleWaterTicketSave = async (e) => {
     e.preventDefault();
 
-    // Similarly do x-www-form-urlencoded:
     const urlParams = new URLSearchParams();
     Object.entries(newWaterTicket).forEach(([key, value]) => {
       urlParams.append(key, String(value === undefined ? "" : value));
@@ -1078,18 +1135,28 @@ function GaugeEntryPage() {
         },
         body: urlParams.toString(),
       });
+
       const textResp = await resp.text();
       let result;
       try {
         result = JSON.parse(textResp);
       } catch (err) {
-        result = {
-          status: "error",
-          message: textResp,
-        };
+        result = { status: "error", message: textResp };
       }
 
       console.log("WaterTicket Save response:", result);
+
+      // If the server complains about the foreign key
+      if (
+        result.message &&
+        result.message.includes("Cannot add or update a child row")
+      ) {
+        alert(
+          "Foreign key constraint failed: The water TankID must exist " +
+            "for your Lease on the server."
+        );
+        return;
+      }
 
       if (result.status !== "success") {
         alert("There was an error saving the water ticket.");
@@ -1105,7 +1172,6 @@ function GaugeEntryPage() {
       } else {
         setWaterTickets((prev) => [...prev, { ...newWaterTicket }]);
       }
-
       closeWaterTicketModal();
     } catch (err) {
       console.error("WaterTicket Save error:", err);
@@ -1113,7 +1179,6 @@ function GaugeEntryPage() {
     }
   };
 
-  // Delete run ticket or water ticket example:
   const handleDeleteRunTicket = (index) => {
     if (!window.confirm("Are you sure you want to delete this run ticket?")) {
       return;
@@ -1123,7 +1188,6 @@ function GaugeEntryPage() {
       copy.splice(index, 1);
       return copy;
     });
-    // If needed, also call your API to remove it from the server
   };
 
   const handleDeleteWaterTicket = (index) => {
@@ -1135,7 +1199,6 @@ function GaugeEntryPage() {
       copy.splice(index, 1);
       return copy;
     });
-    // If needed, also call your API to remove it from the server
   };
 
   /*************************************************
@@ -1152,7 +1215,8 @@ function GaugeEntryPage() {
       {!isOnline && (
         <div className="relative top-0 left-0 w-full z-50 bg-red-600 text-white text-center p-2 font-semibold">
           <i className="fa fa-exclamation-circle mr-2" aria-hidden="true"></i>
-          You are currently offline. Some actions may be unavailable.
+          You are currently offline. Any data submitted will be processed once
+          the network connection is restored.{" "}
         </div>
       )}
 
@@ -1163,7 +1227,7 @@ function GaugeEntryPage() {
             Gauge Entry
           </h3>
           <small className="ml-3 text-sm text-gray-500 italic -mb-1">
-            Logged in as: {userSession.user}
+            Logged in as: {user}
           </small>
         </div>
         <button
@@ -1177,9 +1241,9 @@ function GaugeEntryPage() {
       </nav>
 
       {/* Main Content */}
-      <div className="pt-8 px-2 md:px-4 lg:px-8 pb-8">
+      <div className="pt-8 px-2 md:px-4 lg:px-8 pb-6">
         {/* Lease & Purchaser Info */}
-        <div className="bg-white shadow-lg rounded-lg p-4 mb-4">
+        <div className="bg-white shadow-lg rounded-lg p-3 mb-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             {/* Left side: Lease info */}
             <div className="space-y-1">
@@ -1205,7 +1269,7 @@ function GaugeEntryPage() {
                         href={`tel:${pumperPhone}`}
                         className="text-blue-600 underline hover:text-blue-800 transition-colors"
                       >
-                        {pumperPhone}
+                        {pumperEmail}
                       </a>
                       )
                     </span>
@@ -1268,32 +1332,45 @@ function GaugeEntryPage() {
               </div>
             )}
           </div>
+
           {showLoads && purchaserID && loadsForThisPurchaser.length > 0 && (
             <div className="mt-2 text-xs">
-              <table className="table table-sm table-striped table-bordered w-full">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="p-1 border">Lease</th>
-                    <th className="p-1 border">Tank</th>
-                    <th className="p-1 border">Load #</th>
-                    <th className="p-1 border">Status</th>
-                    <th className="p-1 border">Load Date/Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadsForThisPurchaser.map((ld, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="p-1 border">
-                        {ld.PurchaserLeaseID} - {ld.PurchaserLeaseName}
-                      </td>
-                      <td className="p-1 border">{ld.PurchaserTankNum}</td>
-                      <td className="p-1 border">{ld.LoadNumber}</td>
-                      <td className="p-1 border">{ld.LoadStatus}</td>
-                      <td className="p-1 border">{ld.LoadDate || ""}</td>
+              <div className="flex justify-between items-center">
+                <h4 className="font-medium">Purchaser Lease Loads</h4>
+                <button
+                  type="button"
+                  onClick={() => setExpandPurchaser(!expandPurchaser)}
+                  className="bg-gray-300 hover:bg-gray-400 px-2 py-1 rounded text-xs"
+                >
+                  {expandPurchaser ? "Collapse" : "Expand"}
+                </button>
+              </div>
+              {expandPurchaser && (
+                <table className="table table-sm table-striped table-bordered w-full mt-2">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-1 border">Lease</th>
+                      <th className="p-1 border">Tank</th>
+                      <th className="p-1 border">Load #</th>
+                      <th className="p-1 border">Status</th>
+                      <th className="p-1 border">Load Date/Time</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {loadsForThisPurchaser.map((ld, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="p-1 border">
+                          {ld.PurchaserLeaseID} - {ld.PurchaserLeaseName}
+                        </td>
+                        <td className="p-1 border">{ld.PurchaserTankNum}</td>
+                        <td className="p-1 border">{ld.LoadNumber}</td>
+                        <td className="p-1 border">{ld.LoadStatus}</td>
+                        <td className="p-1 border">{ld.LoadDate || ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
         </div>
@@ -1308,7 +1385,7 @@ function GaugeEntryPage() {
           >
             <form
               onSubmit={handleSubmit}
-              className="bg-white shadow-lg rounded-lg p-4 space-y-4"
+              className="bg-white shadow-lg rounded-lg p-3 space-y-4"
             >
               {/* Hidden inputs */}
               <input type="hidden" name="src" value={src} />
@@ -1320,27 +1397,32 @@ function GaugeEntryPage() {
               {/* Oil Tanks */}
               {showOil && (
                 <div className="p-2 rounded-lg bg-[#D3D3D3]">
-                  <div className="mb-2 bg-[#D3D3D3] p-3 rounded-lg w-full">
-                    <h4 className="font-semibold text-sm text-gray-700 mb-2">
+                  <div className="mb-1 bg-[#D3D3D3] p-2 rounded-lg w-full">
+                    <h4 className="font-bold text-base text-gray-700 mb-1">
                       Oil Tanks
                     </h4>
-                    <div className="bg-white rounded shadow p-2 text-xs w-full">
+
+                    {/* Oil Gauges Container */}
+                    <div className="bg-white rounded shadow p-2 w-full text-sm">
                       {/* Header Row */}
-                      <div className="col-span-12 grid grid-cols-12 gap-2 font-medium text-gray-700 border-b border-gray-200 pb-1 mb-2 px-4">
+                      <div
+                        className={`grid grid-cols-1 gap-2 font-semibold text-gray-700 border-b border-gray-200 pb-1 mb-2 px-3 lg:grid-cols-${
+                          useColorCut ? "12" : "9"
+                        }`}
+                      >
                         <div
                           className={`${
-                            useColorCut ? "col-span-3" : "col-span-4"
+                            useColorCut ? "lg:col-span-3" : "lg:col-span-4"
                           }`}
                         >
                           Tank (Size)
                         </div>
-                        {/* If using ColorCut, combine Top & Color in one column */}
                         {useColorCut ? (
-                          <div className="col-span-9 text-center">
+                          <div className="text-center lg:col-span-9">
                             Top Gauge &amp; Color Cut
                           </div>
                         ) : (
-                          <div className="col-span-8 text-center">
+                          <div className="text-center lg:col-span-8">
                             Top Gauge
                           </div>
                         )}
@@ -1350,116 +1432,242 @@ function GaugeEntryPage() {
                       {oilGauges.map((tank, idx) => (
                         <div
                           key={tank.TankID}
-                          className="col-span-12 grid grid-cols-12 items-center gap-2 py-1 px-4 hover:bg-gray-50 transition-colors"
+                          className="grid grid-cols-1 lg:grid-cols-12 items-center gap-2 py-1 px-3 hover:bg-gray-50 transition-colors"
                         >
+                          {/* Tank Name / Size */}
                           <div
                             className={`${
-                              useColorCut ? "col-span-3" : "col-span-4"
+                              useColorCut ? "lg:col-span-3" : "lg:col-span-4"
                             } font-medium text-gray-800`}
                           >
                             {tank.TankID} ({tank.size})
                           </div>
 
-                          {/* If useColorCut -> place both Top Gauge & ColorCut in one col */}
+                          {/* If we use color cut */}
                           {useColorCut ? (
-                            <div className="col-span-9 flex flex-wrap items-center gap-4">
-                              {/* Top Gauge */}
-                              <div className="flex items-center gap-1">
-                                <label className="text-gray-500">Top Ft:</label>
-                                <input
-                                  type="number"
-                                  className="border p-1 w-12 text-right rounded focus:outline-blue-500"
-                                  value={tank.gaugeFt}
-                                  min="0"
-                                  max="30"
-                                  onChange={(e) => {
-                                    const val = parseFloat(
-                                      e.target.value || "0"
-                                    );
-                                    setOilGauges((prev) => {
-                                      const updated = [...prev];
-                                      updated[idx].gaugeFt = val;
-                                      return updated;
-                                    });
-                                  }}
-                                />
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <label className="text-gray-500">Top In:</label>
-                                <input
-                                  type="number"
-                                  step="0.25"
-                                  min="0"
-                                  max="11.75"
-                                  className="border p-1 w-12 text-right rounded focus:outline-blue-500"
-                                  value={tank.gaugeIn}
-                                  onChange={(e) => {
-                                    const val = parseFloat(
-                                      e.target.value || "0"
-                                    );
-                                    setOilGauges((prev) => {
-                                      const updated = [...prev];
-                                      updated[idx].gaugeIn = val;
-                                      return updated;
-                                    });
-                                  }}
-                                />
-                              </div>
+                            // -------------------------------------------
+                            // NARROW LAYOUT (<= 850px)
+                            // -------------------------------------------
+                            isNarrow ? (
+                              <div className="lg:col-span-9 flex flex-col items-center gap-2">
+                                {/* Top Gauge row (Ft & In) */}
+                                <div className="flex items-center gap-2 justify-center">
+                                  {/* Top Gauge Ft */}
+                                  <div className="flex items-center gap-1">
+                                    <label className="text-gray-600 font-medium">
+                                      Top Ft:
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="30"
+                                      className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
+                                      value={tank.gaugeFt}
+                                      onChange={(e) => {
+                                        const val = parseFloat(
+                                          e.target.value || "0"
+                                        );
+                                        setOilGauges((prev) => {
+                                          const updated = [...prev];
+                                          updated[idx].gaugeFt = val;
+                                          return updated;
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                  {/* Top Gauge In */}
+                                  <div className="flex items-center gap-1">
+                                    <label className="text-gray-600 font-medium">
+                                      Top In:
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.25"
+                                      min="0"
+                                      max="11.75"
+                                      className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
+                                      value={tank.gaugeIn}
+                                      onChange={(e) => {
+                                        const val = parseFloat(
+                                          e.target.value || "0"
+                                        );
+                                        setOilGauges((prev) => {
+                                          const updated = [...prev];
+                                          updated[idx].gaugeIn = val;
+                                          return updated;
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                </div>
 
-                              {/* Color Cut */}
-                              <div className="flex items-center gap-1">
-                                <label className="text-gray-500">Cut Ft:</label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="30"
-                                  className="border p-1 w-12 text-right rounded focus:outline-blue-500"
-                                  value={tank.colorCutFt}
-                                  onChange={(e) => {
-                                    const val = parseFloat(
-                                      e.target.value || "0"
-                                    );
-                                    setOilGauges((prev) => {
-                                      const updated = [...prev];
-                                      updated[idx].colorCutFt = val;
-                                      return updated;
-                                    });
-                                  }}
-                                />
+                                {/* Color Cut row (Ft & In) */}
+                                <div className="flex items-center gap-2 justify-center">
+                                  {/* Color Cut Ft */}
+                                  <div className="flex items-center gap-1">
+                                    <label className="text-gray-600 font-medium">
+                                      Cut Ft:
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="30"
+                                      className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
+                                      value={tank.colorCutFt}
+                                      onChange={(e) => {
+                                        const val = parseFloat(
+                                          e.target.value || "0"
+                                        );
+                                        setOilGauges((prev) => {
+                                          const updated = [...prev];
+                                          updated[idx].colorCutFt = val;
+                                          return updated;
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                  {/* Color Cut In */}
+                                  <div className="flex items-center gap-1">
+                                    <label className="text-gray-600 font-medium">
+                                      Cut In:
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.25"
+                                      min="0"
+                                      max="11.75"
+                                      className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
+                                      value={tank.colorCutIn}
+                                      onChange={(e) => {
+                                        const val = parseFloat(
+                                          e.target.value || "0"
+                                        );
+                                        setOilGauges((prev) => {
+                                          const updated = [...prev];
+                                          updated[idx].colorCutIn = val;
+                                          return updated;
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1">
-                                <label className="text-gray-500">Cut In:</label>
-                                <input
-                                  type="number"
-                                  step="0.25"
-                                  min="0"
-                                  max="11.75"
-                                  className="border p-1 w-12 text-right rounded focus:outline-blue-500"
-                                  value={tank.colorCutIn}
-                                  onChange={(e) => {
-                                    const val = parseFloat(
-                                      e.target.value || "0"
-                                    );
-                                    setOilGauges((prev) => {
-                                      const updated = [...prev];
-                                      updated[idx].colorCutIn = val;
-                                      return updated;
-                                    });
-                                  }}
-                                />
+                            ) : (
+                              // -------------------------------------------
+                              // ORIGINAL LAYOUT (> 850px)
+                              // -------------------------------------------
+                              <div className="lg:col-span-9 flex flex-col lg:flex-row items-center gap-2">
+                                {/* Top Gauge Ft */}
+                                <div className="flex items-center gap-1">
+                                  <label className="text-gray-600 font-medium">
+                                    Top Ft:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="30"
+                                    className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
+                                    value={tank.gaugeFt}
+                                    onChange={(e) => {
+                                      const val = parseFloat(
+                                        e.target.value || "0"
+                                      );
+                                      setOilGauges((prev) => {
+                                        const updated = [...prev];
+                                        updated[idx].gaugeFt = val;
+                                        return updated;
+                                      });
+                                    }}
+                                  />
+                                </div>
+                                {/* Top Gauge In */}
+                                <div className="flex items-center gap-1">
+                                  <label className="text-gray-600 font-medium">
+                                    Top In:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.25"
+                                    min="0"
+                                    max="11.75"
+                                    className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
+                                    value={tank.gaugeIn}
+                                    onChange={(e) => {
+                                      const val = parseFloat(
+                                        e.target.value || "0"
+                                      );
+                                      setOilGauges((prev) => {
+                                        const updated = [...prev];
+                                        updated[idx].gaugeIn = val;
+                                        return updated;
+                                      });
+                                    }}
+                                  />
+                                </div>
+                                {/* Color Cut Ft */}
+                                <div className="flex items-center gap-1">
+                                  <label className="text-gray-600 font-medium">
+                                    Cut Ft:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="30"
+                                    className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
+                                    value={tank.colorCutFt}
+                                    onChange={(e) => {
+                                      const val = parseFloat(
+                                        e.target.value || "0"
+                                      );
+                                      setOilGauges((prev) => {
+                                        const updated = [...prev];
+                                        updated[idx].colorCutFt = val;
+                                        return updated;
+                                      });
+                                    }}
+                                  />
+                                </div>
+                                {/* Color Cut In */}
+                                <div className="flex items-center gap-1">
+                                  <label className="text-gray-600 font-medium">
+                                    Cut In:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.25"
+                                    min="0"
+                                    max="11.75"
+                                    className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
+                                    value={tank.colorCutIn}
+                                    onChange={(e) => {
+                                      const val = parseFloat(
+                                        e.target.value || "0"
+                                      );
+                                      setOilGauges((prev) => {
+                                        const updated = [...prev];
+                                        updated[idx].colorCutIn = val;
+                                        return updated;
+                                      });
+                                    }}
+                                  />
+                                </div>
                               </div>
-                            </div>
+                            )
                           ) : (
-                            // If NOT using color cut, show only Top Gauge
-                            <div className="col-span-8 flex flex-wrap items-center gap-2 px-2 md:pl-[100px] justify-start">
+                            // -------------------------------------------
+                            // NO COLOR CUT
+                            // -------------------------------------------
+                            <div className="lg:col-span-8 flex flex-col lg:flex-row items-center gap-2 px-2 justify-start">
                               <div className="flex items-center gap-1">
-                                <label className="text-gray-500">Ft:</label>
+                                <label className="text-gray-600 font-medium">
+                                  Ft:
+                                </label>
                                 <input
                                   type="number"
-                                  className="border p-1 w-12 text-right rounded focus:outline-blue-500"
-                                  value={tank.gaugeFt}
                                   min="0"
                                   max="30"
+                                  className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
+                                  value={tank.gaugeFt}
                                   onChange={(e) => {
                                     const val = parseFloat(
                                       e.target.value || "0"
@@ -1473,13 +1681,15 @@ function GaugeEntryPage() {
                                 />
                               </div>
                               <div className="flex items-center gap-1">
-                                <label className="text-gray-500">In:</label>
+                                <label className="text-gray-600 font-medium">
+                                  In:
+                                </label>
                                 <input
                                   type="number"
                                   step="0.25"
                                   min="0"
                                   max="11.75"
-                                  className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                                  className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                                   value={tank.gaugeIn}
                                   onChange={(e) => {
                                     const val = parseFloat(
@@ -1498,14 +1708,16 @@ function GaugeEntryPage() {
                         </div>
                       ))}
 
-                      {/* Tbg, Csg, POC, etc. */}
-                      <div className="col-span-12 flex flex-wrap items-center gap-2 mt-2 px-4 justify-center">
+                      {/* Additional Controls: Tbg, Csg, etc. */}
+                      <div className="flex flex-col lg:flex-row items-center gap-2 mt-2 px-4 justify-center">
                         {use24 && (
                           <div className="flex items-center gap-1">
-                            <label className="text-gray-500">GaugeTime:</label>
+                            <label className="text-gray-600 font-medium">
+                              GaugeTime:
+                            </label>
                             <input
                               type="time"
-                              className="border p-1 w-24 text-xs text-right rounded focus:outline-blue-500"
+                              className="border px-2 py-1 w-20 text-sm text-right rounded focus:outline-blue-500"
                               value={gaugeTime}
                               onChange={(e) => setGaugeTime(e.target.value)}
                             />
@@ -1513,12 +1725,14 @@ function GaugeEntryPage() {
                         )}
                         {showPOC && (
                           <div className="flex items-center gap-1">
-                            <label className="text-gray-500">POC %:</label>
+                            <label className="text-gray-600 font-medium">
+                              POC %:
+                            </label>
                             <input
                               type="number"
-                              className="border p-1 w-12 text-right rounded focus:outline-blue-500"
                               min="0"
                               max="100"
+                              className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                               value={pocRunTime}
                               onChange={(e) =>
                                 setPocRunTime(parseFloat(e.target.value || "0"))
@@ -1527,10 +1741,12 @@ function GaugeEntryPage() {
                           </div>
                         )}
                         <div className="flex items-center gap-1">
-                          <label className="text-gray-500">Tbg psi:</label>
+                          <label className="text-gray-600 font-medium">
+                            Tbg psi:
+                          </label>
                           <input
                             type="number"
-                            className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                            className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                             value={tbgPressure}
                             onChange={(e) =>
                               setTbgPressure(parseFloat(e.target.value || "0"))
@@ -1538,10 +1754,12 @@ function GaugeEntryPage() {
                           />
                         </div>
                         <div className="flex items-center gap-1">
-                          <label className="text-gray-500">Csg psi:</label>
+                          <label className="text-gray-600 font-medium">
+                            Csg psi:
+                          </label>
                           <input
                             type="number"
-                            className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                            className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                             value={csgPressure}
                             onChange={(e) =>
                               setCsgPressure(parseFloat(e.target.value || "0"))
@@ -1561,18 +1779,20 @@ function GaugeEntryPage() {
                     Gas
                   </h4>
                   {hasGasMeter && (
-                    <div className="flex items-center gap-1 text-xs p-2 bg-white rounded shadow-sm mb-2">
-                      <label className="text-gray-500">Gas Meter:</label>
+                    <div className="flex items-center gap-1 text-sm p-2 bg-white rounded shadow-sm mb-2">
+                      <label className="text-gray-600 font-medium">
+                        Gas Meter:
+                      </label>
                       <input
                         type="number"
-                        className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                        className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                         value={gasMeter}
                         onChange={(e) =>
                           setGasMeter(parseFloat(e.target.value || "0"))
                         }
                       />
                       <select
-                        className="border p-1 text-xs rounded focus:outline-blue-500"
+                        className="border px-2 py-1 text-sm rounded focus:outline-blue-500"
                         value={gasMeterReset}
                         onChange={(e) => setGasMeterReset(e.target.value)}
                       >
@@ -1583,12 +1803,14 @@ function GaugeEntryPage() {
                   )}
 
                   {showMcf && (
-                    <div className="text-xs space-y-2">
+                    <div className="text-sm space-y-2">
                       <div className="flex flex-wrap items-center gap-1 p-2 bg-white rounded shadow-sm">
-                        <label className="text-gray-500">MCF:</label>
+                        <label className="text-gray-600 font-medium">
+                          MCF:
+                        </label>
                         <input
                           type="number"
-                          className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                          className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                           value={mcf}
                           onChange={(e) =>
                             setMcf(parseFloat(e.target.value || "0"))
@@ -1596,10 +1818,12 @@ function GaugeEntryPage() {
                         />
                         {showMcfAccum && (
                           <>
-                            <label className="text-gray-500">Accum:</label>
+                            <label className="text-gray-600 font-medium">
+                              Accum:
+                            </label>
                             <input
                               type="number"
-                              className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                              className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                               value={mcfAccum}
                               onChange={(e) =>
                                 setMcfAccum(parseFloat(e.target.value || "0"))
@@ -1609,10 +1833,12 @@ function GaugeEntryPage() {
                         )}
                         {useLinePressure && (
                           <>
-                            <label className="text-gray-500">FLP:</label>
+                            <label className="text-gray-600 font-medium">
+                              FLP:
+                            </label>
                             <input
                               type="number"
-                              className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                              className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                               value={linePressure}
                               onChange={(e) =>
                                 setLinePressure(
@@ -1623,59 +1849,74 @@ function GaugeEntryPage() {
                           </>
                         )}
                       </div>
+
                       <div className="flex flex-wrap items-center gap-1 p-2 bg-white rounded shadow-sm">
-                        <label className="text-gray-500">Static:</label>
+                        <label className="text-gray-600 font-medium">
+                          Static:
+                        </label>
                         <input
                           type="number"
-                          className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                          className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                           value={staticPressure}
                           onChange={(e) =>
                             setStaticPressure(parseFloat(e.target.value || "0"))
                           }
                         />
-                        <label className="text-gray-500">Diff:</label>
+                        <label className="text-gray-600 font-medium">
+                          Diff:
+                        </label>
                         <input
                           type="number"
-                          className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                          className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                           value={diffPressure}
                           onChange={(e) =>
                             setDiffPressure(parseFloat(e.target.value || "0"))
                           }
                         />
-                        <label className="text-gray-500">Flow:</label>
+                        <label className="text-gray-600 font-medium">
+                          Flow:
+                        </label>
                         <input
                           type="number"
-                          className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                          className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                           value={flowRate}
                           onChange={(e) =>
                             setFlowRate(parseFloat(e.target.value || "0"))
                           }
                         />
                       </div>
+
                       <div className="flex flex-wrap items-center gap-1 p-2 bg-white rounded shadow-sm">
-                        <label className="text-gray-500">Choke:</label>
+                        <label className="text-gray-600 font-medium">
+                          Choke:
+                        </label>
                         <input
                           type="number"
-                          className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                          className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                           value={choke}
                           onChange={(e) =>
                             setChoke(parseFloat(e.target.value || "0"))
                           }
                         />
-                        <label className="text-gray-500">Hrs On:</label>
+                        <label className="text-gray-600 font-medium">
+                          Hrs On:
+                        </label>
                         <input
                           type="number"
-                          className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                          className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                           value={hoursOn}
                           onChange={(e) =>
                             setHoursOn(parseFloat(e.target.value || "0"))
                           }
                         />
                       </div>
+
                       <div className="flex items-center gap-1 p-2 bg-white rounded shadow-sm">
-                        <label className="text-gray-500">Gas Disp:</label>
+                        <label className="text-gray-600 font-medium">
+                          Gas Disp:
+                        </label>
                         <select
-                          className="border p-1 text-xs rounded focus:outline-blue-500"
+                          className="border px-2 py-1 text-sm rounded focus:outline-blue-500"
                           value={gasDisp}
                           onChange={(e) => setGasDisp(e.target.value)}
                         >
@@ -1695,23 +1936,25 @@ function GaugeEntryPage() {
               {/* Water */}
               {showWater && (
                 <div className="p-2 rounded-lg bg-[#ADD8E6]">
-                  <h4 className="font-semibold text-sm text-gray-700 mb=2">
+                  <h4 className="font-semibold text-sm text-gray-700 mb-2">
                     Water
                   </h4>
                   {showWaterTanks &&
                     waterGauges.map((tank, idx) => (
                       <div
                         key={tank.TankID}
-                        className="flex flex-wrap items-center gap-1 mb-2 text-xs p-2 bg-white rounded shadow-sm"
+                        className="flex flex-wrap items-center gap-1 mb-2 text-sm p-2 bg-white rounded shadow-sm"
                       >
                         <label className="font-medium">
                           {tank.TankID} ({tank.size})
                         </label>
                         <div className="flex items-center gap-1 ml-2">
-                          <label className="text-gray-500">Ft:</label>
+                          <label className="text-gray-600 font-medium">
+                            Ft:
+                          </label>
                           <input
                             type="number"
-                            className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                            className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                             value={tank.gaugeFt}
                             onChange={(e) => {
                               const val = parseFloat(e.target.value || "0");
@@ -1724,10 +1967,12 @@ function GaugeEntryPage() {
                           />
                         </div>
                         <div className="flex items-center gap-1">
-                          <label className="text-gray-500">In:</label>
+                          <label className="text-gray-600 font-medium">
+                            In:
+                          </label>
                           <input
                             type="number"
-                            className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                            className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                             value={tank.gaugeIn}
                             onChange={(e) => {
                               const val = parseFloat(e.target.value || "0");
@@ -1743,18 +1988,20 @@ function GaugeEntryPage() {
                     ))}
 
                   {hasWaterMeter && (
-                    <div className="flex flex-wrap items-center gap-1 text-xs p-2 bg-white rounded shadow-sm">
-                      <label className="text-gray-500">Meter:</label>
+                    <div className="flex flex-wrap items-center gap-1 text-sm p-2 bg-white rounded shadow-sm">
+                      <label className="text-gray-600 font-medium">
+                        Meter:
+                      </label>
                       <input
                         type="number"
-                        className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                        className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                         value={waterMeter}
                         onChange={(e) =>
                           setWaterMeter(parseFloat(e.target.value || "0"))
                         }
                       />
                       <select
-                        className="border p-1 text-xs rounded focus:outline-blue-500"
+                        className="border px-2 py-1 text-sm rounded focus:outline-blue-500"
                         value={waterMeterReset}
                         onChange={(e) => setWaterMeterReset(e.target.value)}
                       >
@@ -1764,11 +2011,13 @@ function GaugeEntryPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-1 text-xs p-2 bg-white rounded shadow-sm mt-2">
-                    <label className="text-gray-500">{manualWaterLabel}:</label>
+                  <div className="flex items-center gap-1 text-sm p-2 bg-white rounded shadow-sm mt-2">
+                    <label className="text-gray-600 font-medium">
+                      {manualWaterLabel}:
+                    </label>
                     <input
                       type="number"
-                      className="border p-1 w-12 text-right rounded focus:outline-blue-500"
+                      className="border px-2 py-1 w-16 text-right rounded focus:outline-blue-500"
                       value={manualWater}
                       onChange={(e) =>
                         setManualWater(parseFloat(e.target.value || "0"))
@@ -1780,11 +2029,11 @@ function GaugeEntryPage() {
               )}
 
               {/* Notes / Wells / Submit */}
-              <div className="bg-white border p-3 rounded text-xs col-span-1 md:col-span-2 space-y-2 shadow-sm mt-4">
+              <div className="bg-white border p-3 rounded text-sm col-span-1 md:col-span-2 space-y-2 shadow-sm mt-3">
                 <label className="font-semibold">Notes</label>
                 <textarea
                   rows={2}
-                  className="border p-1 w-full mt-1 rounded focus:outline-blue-500"
+                  className="border p-1 w-full mt-1 rounded focus:outline-blue-500 text-sm"
                   placeholder="Any additional comments or observations..."
                   value={comments}
                   onChange={(e) => setComments(e.target.value)}
@@ -1793,7 +2042,7 @@ function GaugeEntryPage() {
                   <div className="flex items-center gap-1">
                     <label className="font-semibold">SPCC</label>
                     <select
-                      className="border p-1 text-xs rounded focus:outline-blue-500"
+                      className="border p-1 text-sm rounded focus:outline-blue-500"
                       value={spcc}
                       onChange={(e) => setSpcc(e.target.value)}
                     >
@@ -1806,7 +2055,7 @@ function GaugeEntryPage() {
                   <div className="flex items-center gap-1">
                     <label className="font-semibold">Initial Gauges</label>
                     <select
-                      className="border p-1 text-xs rounded focus:outline-blue-500"
+                      className="border p-1 text-sm rounded focus:outline-blue-500"
                       value={initialGauges}
                       onChange={(e) => setInitialGauges(e.target.value)}
                     >
@@ -2094,8 +2343,7 @@ function GaugeEntryPage() {
                   Submit
                 </button>
                 <div className="text-xs text-gray-500 italic">
-                  Last Entry by {userSession.user} on{" "}
-                  {new Date().toLocaleString()}
+                  Last Entry by {lastUser} on {lastUpdateDate}
                 </div>
               </div>
             </form>
@@ -2113,7 +2361,7 @@ function GaugeEntryPage() {
                   {/* Oil summary */}
                   {showOil && (
                     <>
-                      <div className="flex justify-between bg-[#D3D3D3] p-2 text-xs rounded">
+                      <div className="flex justify-between bg-[#D3D3D3] p-2 text-sm rounded">
                         <label className="font-medium">Oil Produced</label>
                         <div>
                           <span className="mr-2">
@@ -2122,22 +2370,22 @@ function GaugeEntryPage() {
                           {oilProduced.toFixed(2)} bbls
                         </div>
                       </div>
-                      <div className="flex justify-between bg-[#D3D3D3] p-2 text-xs rounded mt-1">
+                      <div className="flex justify-between bg-[#D3D3D3] p-2 text-sm rounded mt-1">
                         <label className="font-medium">Oil Sold</label>
                         <div>{soldOil.toFixed(2)} bbls</div>
                       </div>
                       {showBSW && (
-                        <div className="flex justify-between bg-[#D3D3D3] p-2 text-xs rounded mt-1">
+                        <div className="flex justify-between bg-[#D3D3D3] p-2 text-sm rounded mt-1">
                           <label className="font-medium">BS&amp;W</label>
                           <div>{drawBbls.toFixed(2)} bbls</div>
                         </div>
                       )}
-                      <div className="flex justify-between bg-[#D3D3D3] p-2 text-xs rounded mt-1">
+                      <div className="flex justify-between bg-[#D3D3D3] p-2 text-sm rounded mt-1">
                         <label className="font-medium">On Hand</label>
                         <div>{oilOnHand.toFixed(2)} bbls</div>
                       </div>
                       {useColorCut && (
-                        <div className="flex justify-between bg-[#D3D3D3] p-2 text-xs rounded mt-1">
+                        <div className="flex justify-between bg-[#D3D3D3] p-2 text-sm rounded mt-1">
                           <label className="font-medium">ColorCut OnHand</label>
                           <div>{colorCutOnHand.toFixed(2)} bbls</div>
                         </div>
@@ -2147,7 +2395,7 @@ function GaugeEntryPage() {
 
                   {/* Gas summary */}
                   {showGas && hasGasMeter && (
-                    <div className="flex justify-between bg-[#FFFFE0] p-2 text-xs rounded mt-2">
+                    <div className="flex justify-between bg-[#FFFFE0] p-2 text-sm rounded mt-2">
                       <label className="font-medium">Gas Metered</label>
                       <div>{meteredGas.toFixed(0)} mcf</div>
                     </div>
@@ -2157,19 +2405,19 @@ function GaugeEntryPage() {
                   {showWater && (
                     <>
                       {hasWaterMeter && (
-                        <div className="flex justify-between bg-[#ADD8E6] p-2 text-xs rounded mt-2">
+                        <div className="flex justify-between bg-[#ADD8E6] p-2 text-sm rounded mt-2">
                           <label className="font-medium">Water Metered</label>
                           <div>{meteredWater.toFixed(0)} bbls</div>
                         </div>
                       )}
-                      <div className="flex justify-between bg-[#ADD8E6] p-2 text-xs rounded mt-1">
+                      <div className="flex justify-between bg-[#ADD8E6] p-2 text-sm rounded mt-1">
                         <label className="font-medium">
                           {manualWaterLabel}
                         </label>
                         <div>{manualWater} bbls</div>
                       </div>
                       {showWaterTanks && (
-                        <div className="flex justify-between bg-[#ADD8E6] p-2 text-xs rounded mt-1">
+                        <div className="flex justify-between bg-[#ADD8E6] p-2 text-sm rounded mt-1">
                           <label className="font-medium">Water Produced</label>
                           <div>
                             {waterInchesProduced.toFixed(2)} in /{" "}
@@ -2177,12 +2425,12 @@ function GaugeEntryPage() {
                           </div>
                         </div>
                       )}
-                      <div className="flex justify-between bg-[#ADD8E6] p-2 text-xs rounded mt-1">
+                      <div className="flex justify-between bg-[#ADD8E6] p-2 text-sm rounded mt-1">
                         <label className="font-medium">Water Hauled</label>
                         <div>{waterHauledBbls.toFixed(0)} bbls</div>
                       </div>
                       {showWaterTanks && (
-                        <div className="flex justify-between bg-[#ADD8E6] p-2 text-xs rounded mt-1">
+                        <div className="flex justify-between bg-[#ADD8E6] p-2 text-sm rounded mt-1">
                           <label className="font-medium">Water On Hand</label>
                           <div>{waterOnHand.toFixed(2)} bbls</div>
                         </div>
@@ -2193,7 +2441,6 @@ function GaugeEntryPage() {
               )}
 
               {/* Images */}
-              {/* Replace these with your actual image-adding logic */}
               <div className="bg-white border p-3 text-sm rounded-lg shadow-sm">
                 <h4 className="text-center font-semibold text-gray-700 mb-2">
                   Images
@@ -2255,7 +2502,7 @@ function GaugeEntryPage() {
                     <div className="mt-2 flex gap-2">
                       <button
                         className="bg-yellow-200 hover:bg-yellow-300 px-2 py-1 rounded text-xs"
-                        onClick={() => openRunTicketModal(idx)} // Edit
+                        onClick={() => openRunTicketModal(idx)}
                       >
                         Edit
                       </button>
@@ -2302,7 +2549,7 @@ function GaugeEntryPage() {
                     <div className="mt-2 flex gap-2">
                       <button
                         className="bg-yellow-200 hover:bg-yellow-300 px-2 py-1 rounded text-xs"
-                        onClick={() => openWaterTicketModal(idx)} // Edit
+                        onClick={() => openWaterTicketModal(idx)}
                       >
                         Edit
                       </button>
@@ -2320,8 +2567,8 @@ function GaugeEntryPage() {
           )}
         </div>
 
-        {/* NEW: Recent Gauge History */}
-        <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
+        {/* Recent Gauge History */}
+        <div className="bg-white shadow-lg rounded-lg p-3 mt-3">
           <div className="flex items-center justify-between mb-1">
             <h4 className="font-semibold text-sm text-gray-700">
               Recent Gauge History
@@ -2390,7 +2637,7 @@ function GaugeEntryPage() {
             <form onSubmit={handleRunTicketSave} className="space-y-2 text-sm">
               {/* Ticket ID */}
               <div>
-                <label className="block font-semibold">Run Ticket ID:</label>
+                <label className="block font-semibold">Run Ticket #:</label>
                 <input
                   type="text"
                   className="border rounded p-1 w-full"
@@ -2403,6 +2650,28 @@ function GaugeEntryPage() {
                     })
                   }
                 />
+              </div>
+
+              {/* Tank ID Dropdown */}
+              <div>
+                <label className="block font-semibold">Tank ID:</label>
+                <select
+                  className="border rounded p-1 w-full"
+                  value={newRunTicket.tankId}
+                  onChange={(e) =>
+                    setNewRunTicket({
+                      ...newRunTicket,
+                      tankId: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">-- Select a Tank --</option>
+                  {tanks.map((tank) => (
+                    <option key={tank.UniqID} value={tank.TankID}>
+                      {tank.TankID}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Time */}
@@ -2495,7 +2764,7 @@ function GaugeEntryPage() {
                 </div>
               </div>
 
-              {/* Extra fields */}
+              {/* Run Ticket #, Gravity, Temp, BSW */}
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="block font-semibold">
@@ -2513,25 +2782,6 @@ function GaugeEntryPage() {
                     }
                   />
                 </div>
-                <div className="flex-1">
-                  <label className="block font-semibold">Disposition:</label>
-                  <input
-                    type="text"
-                    className="border rounded p-1 w-full"
-                    placeholder="Disposition note"
-                    value={newRunTicket.disposition}
-                    onChange={(e) =>
-                      setNewRunTicket({
-                        ...newRunTicket,
-                        disposition: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Gravity, BSW, etc. */}
-              <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="block font-semibold">Gravity:</label>
                   <input
@@ -2576,22 +2826,7 @@ function GaugeEntryPage() {
                 </div>
               </div>
 
-              {/* Comments */}
-              <div>
-                <label className="block font-semibold">Comments:</label>
-                <textarea
-                  rows={2}
-                  className="border rounded p-1 w-full"
-                  placeholder="Any notes about this run ticket..."
-                  value={newRunTicket.comments}
-                  onChange={(e) =>
-                    setNewRunTicket({
-                      ...newRunTicket,
-                      comments: e.target.value,
-                    })
-                  }
-                />
-              </div>
+              {/* NOTE: "Disposition" and "Comments" have been removed per your request */}
 
               {/* Buttons */}
               <div className="flex justify-end gap-2 mt-2">
@@ -2648,6 +2883,28 @@ function GaugeEntryPage() {
                     })
                   }
                 />
+              </div>
+
+              {/* Tank ID Dropdown */}
+              <div>
+                <label className="block font-semibold">Tank ID:</label>
+                <select
+                  className="border rounded p-1 w-full"
+                  value={newWaterTicket.tankId}
+                  onChange={(e) =>
+                    setNewWaterTicket({
+                      ...newWaterTicket,
+                      tankId: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">-- Select a Tank --</option>
+                  {tanks.map((tank) => (
+                    <option key={tank.UniqID} value={tank.TankID}>
+                      {tank.TankID}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Gauge Time */}
@@ -2772,22 +3029,7 @@ function GaugeEntryPage() {
                 </div>
               </div>
 
-              {/* Comments */}
-              <div>
-                <label className="block font-semibold">Comments:</label>
-                <textarea
-                  rows={2}
-                  className="border rounded p-1 w-full"
-                  placeholder="Any notes about this water ticket..."
-                  value={newWaterTicket.comments}
-                  onChange={(e) =>
-                    setNewWaterTicket({
-                      ...newWaterTicket,
-                      comments: e.target.value,
-                    })
-                  }
-                />
-              </div>
+              {/* NOTE: Removed "Comments" from Water Tickets as requested */}
 
               {/* Buttons */}
               <div className="flex justify-end gap-2 mt-2">
