@@ -3,22 +3,26 @@ import { FiUser } from "react-icons/fi";
 import { useTheme } from "./ThemeContext";
 import { baseUrl } from "./config";
 import { useUser } from "./UserContext";
+import { useNavigate } from "react-router-dom";
 
 /**
- * This component demonstrates:
- *  1. Fetching user details & all leases on mount.
- *  2. Filtering leases for the current user (unless admin).
- *  3. Reading an "activeLease" from URL query params.
- *  4. Picking the lease that **immediately follows** the activeLease in `filteredLeases`.
+ * This component:
+ *  1. Fetches user details & all leases on mount.
+ *  2. Each lease includes Tanks, Wells, DailyGauges, etc. (from the new leases.php).
+ *  3. Filters leases for the current user (unless admin).
+ *  4. Lets you select a lease + date + action, then navigates to Gauges page
+ *     passing the entire selected lease object in state.
+ *  5. Does NOT call service_getgauges.php; we rely on the data from leases.php.
  */
 const GaugeEntry = () => {
   const { theme } = useTheme();
   const { userID } = useUser();
+  const navigate = useNavigate();
 
   // State for user details
   const [userDetails, setUserDetails] = useState(null);
 
-  // State for all leases from API
+  // State for all leases from API (or localStorage if offline)
   const [leases, setLeases] = useState([]);
 
   // State for selected date
@@ -30,9 +34,9 @@ const GaugeEntry = () => {
   // State for chosen action
   const [selectedAction, setSelectedAction] = useState("Daily Gauges");
 
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
   // 1) Fetch user details
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
   const fetchUserDetails = useCallback(async () => {
     try {
       const response = await fetch(
@@ -50,41 +54,70 @@ const GaugeEntry = () => {
     }
   }, [userID]);
 
-  //////////////////////////////////////////////////////////////////////////////
-  // 2) Fetch all leases
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
+  // 2) Fetch all leases (with ?user=...) from your new leases.php
+  //    Always commit leases to localStorage, and if offline or error, fallback.
+  /////////////////////////////////////////////////////////////////////////////
   const fetchLeases = useCallback(async () => {
+    // 1) If offline, skip fetch & use localStorage
+    if (!navigator.onLine) {
+      console.log("Offline mode detected, using localStorage for leases");
+      const storedLeases = localStorage.getItem("leases");
+      if (storedLeases) {
+        setLeases(JSON.parse(storedLeases));
+      }
+      return;
+    }
+
+    // 2) Otherwise, attempt the fetch from the API
     try {
-      const response = await fetch(`${baseUrl}/api/leases.php`);
+      const response = await fetch(`${baseUrl}/api/leases.php?user=${userID}`);
       if (!response.ok) throw new Error("Network response was not ok");
-      const leaseData = await response.json();
-      setLeases(leaseData);
+
+      const data = await response.json();
+      if (data.status === "success" && Array.isArray(data.leases)) {
+        // Update state & localStorage
+        setLeases(data.leases);
+        localStorage.setItem("leases", JSON.stringify(data.leases));
+      } else {
+        console.error("Failed to fetch leases or malformed data:", data);
+        // fallback to localStorage
+        const storedLeases = localStorage.getItem("leases");
+        if (storedLeases) {
+          setLeases(JSON.parse(storedLeases));
+        }
+      }
     } catch (error) {
       console.error("Error fetching leases:", error);
+      // fallback to localStorage
+      const storedLeases = localStorage.getItem("leases");
+      if (storedLeases) {
+        setLeases(JSON.parse(storedLeases));
+      }
     }
-  }, []);
+  }, [userID]);
 
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
   // 3) useEffect to fetch data on mount & set default date
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
   useEffect(() => {
-    fetchLeases();
     fetchUserDetails();
+    fetchLeases();
     setSelectedDate(new Date().toISOString().split("T")[0]);
-  }, [fetchLeases, fetchUserDetails]);
+  }, [fetchUserDetails, fetchLeases]);
 
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
   // 4) Determine if user is Admin
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
   const isAdmin =
     userDetails?.IsAdmin === "Y" ||
     userDetails?.UserID?.toLowerCase() === "admin" ||
     userDetails?.Role?.toLowerCase() === "a" ||
     userDetails?.Role?.toLowerCase() === "i";
 
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
   // 5) Filter leases for this user (unless Admin)
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
   const filteredLeases = leases
     .filter((lease) => {
       return (
@@ -95,49 +128,70 @@ const GaugeEntry = () => {
     })
     .sort((a, b) => a.LeaseName.localeCompare(b.LeaseName));
 
-  //////////////////////////////////////////////////////////////////////////////
-  // 6) Find the "activeLease" from URL, pick the next lease
-  //    If not found or it's the last, pick the first as fallback.
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
+  // 6) Optionally read "activeLease" from URL, pick next lease, etc.
+  /////////////////////////////////////////////////////////////////////////////
   useEffect(() => {
-    // We only do this if we haven't manually selected a lease yet
     if (selectedLeaseID) return;
 
-    // 6A) Grab "activeLease" from the query param
     const urlParams = new URLSearchParams(window.location.search);
     const activeLeaseParam = urlParams.get("activeLease") || "";
 
-    // 6B) If we have any leases
     if (filteredLeases.length > 0) {
-      // 6C) Find the index of activeLease
       const idx = filteredLeases.findIndex(
         (l) => l.LeaseID === activeLeaseParam
       );
       if (idx >= 0 && idx < filteredLeases.length - 1) {
-        // The next lease in the array
         setSelectedLeaseID(filteredLeases[idx + 1].LeaseID);
       } else {
-        // Fallback: if it's the last or not found, pick the first lease
         setSelectedLeaseID(filteredLeases[0].LeaseID);
       }
     }
   }, [filteredLeases, selectedLeaseID]);
 
-  //////////////////////////////////////////////////////////////////////////////
-  // 7) Handle the GO button click
-  //    -> Navigate to new page with selectedLeaseID in query string
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
+  // 7) Handle the GO button click -> Navigate to Gauges screen
+  //    passing the entire selected lease object in state.
+  //    If offline, use localStorage data to find the selected lease.
+  /////////////////////////////////////////////////////////////////////////////
   const handleGoClick = () => {
-    if (selectedLeaseID) {
-      window.location.href = `/GaugeEntry?leaseid=${selectedLeaseID}`;
-    } else {
+    if (!selectedLeaseID) {
       alert("Please select a Lease first.");
+      return;
     }
+
+    let selLease = filteredLeases.find((l) => l.LeaseID === selectedLeaseID);
+
+    // If offline, try to fetch from localStorage
+    if (!navigator.onLine) {
+      const storedLeases = localStorage.getItem("leases");
+      if (storedLeases) {
+        const parsedLeases = JSON.parse(storedLeases);
+        selLease = parsedLeases.find((l) => l.LeaseID === selectedLeaseID);
+      }
+    }
+
+    if (!selLease) {
+      alert("Selected lease not found. Please choose again.");
+      return;
+    }
+    console.log(selLease);
+
+    navigate(
+      `/GaugeEntry?leaseid=${selectedLeaseID}&date=${selectedDate}&action=${selectedAction}`,
+      {
+        state: {
+          lease: selLease, // includes DailyGauges if provided by the API
+          gaugeDate: selectedDate,
+          action: selectedAction,
+        },
+      }
+    );
   };
 
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
   // RENDER
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
   return (
     <div
       className={`min-h-screen ${
@@ -254,23 +308,13 @@ const GaugeEntry = () => {
             </select>
           </div>
 
-          {/* GO button -> Navigates with query params */}
+          {/* GO button -> Navigates to Gauges page with lease data in state */}
           <div>
             <button
               className="w-full bg-gradient-to-br from-indigo-900 to-indigo-800 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg text-lg transition duration-300 ease-in-out"
               onClick={handleGoClick}
             >
               GO
-            </button>
-          </div>
-
-          {/* View Inventory & View Production Buttons */}
-          <div className="flex flex-col sm:flex-row justify-between space-y-4 sm:space-y-0 sm:space-x-4">
-            <button className="w-full sm:w-auto bg-gradient-to-br from-blue-900 to-blue-800 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg text-lg transition duration-300 ease-in-out">
-              View Inventory
-            </button>
-            <button className="w-full sm:w-auto bg-gradient-to-br from-green-900 to-green-800 hover:bg-green-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg text-lg transition duration-300 ease-in-out">
-              View Production
             </button>
           </div>
         </div>
