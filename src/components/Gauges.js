@@ -6,6 +6,7 @@ import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import { baseUrl } from "./config.js";
 import { useUser } from "./UserContext";
+import { LastPage } from "@mui/icons-material";
 
 /**
  * MAIN COMPONENT
@@ -135,39 +136,64 @@ function GaugeEntryPage() {
   const [oilGauges, setOilGauges] = useState([]);
   const [waterGauges, setWaterGauges] = useState([]);
   const [wellEntries, setWellEntries] = useState([]);
+
   useEffect(() => {
     if (!leaseData) return;
 
     console.log("Lease data:", leaseData);
 
-    // 1) Basic lease-level fields
-    setLeaseID(leaseData.LeaseID || "");
-    setLeaseName(leaseData.LeaseName || "");
-    setPumper(leaseData.PumperID || "");
-    setPurchaserID(leaseData.Purchaser || "");
-    setPurchaser(leaseData.Purchaser || "");
-    setPurchaserLeaseNo(leaseData.PurchaserLeaseNo || "");
+    //------------------------------------------------
+    // 1) Basic Lease-Level Fields
+    //------------------------------------------------
+    setLeaseID(leaseData.LeaseID ?? "");
+    setLeaseName(leaseData.LeaseName ?? "");
+    setPumper(leaseData.PumperID ?? "");
+    setLastUser(leaseData.RecentLogUserID ?? "");
+    setLastUpdateDate(leaseData.RecentLogDateTime ?? "");
+    if (lastUpdateDate) {
+      lastUpdateDate.format("MM/DD/YYYY");
+    }
+    // Purchaser info
+    setPurchaserID(leaseData.Purchaser ?? "");
+    setPurchaser(leaseData.Purchaser ?? "");
+    setPurchaserLeaseNo(leaseData.PurchaserLeaseNo ?? "");
 
+    // Pumper Contact
     if (leaseData.PumperInfo) {
-      setPumperEmail(leaseData.PumperInfo.Email || "");
-      setPumperPhone(leaseData.PumperInfo.Phone || "");
+      setPumperEmail(leaseData.PumperInfo.Email ?? "");
+      setPumperPhone(leaseData.PumperInfo.Phone ?? "");
     } else {
       setPumperEmail("");
       setPumperPhone("");
     }
 
+    //------------------------------------------------
+    // 2) Feature Flags
+    //------------------------------------------------
     setShowOil(leaseData.ShowOil === "Y");
     setShowWater(leaseData.ShowWater === "Y");
     setShowGas(leaseData.ShowGas === "Y");
     setHasGasMeter(leaseData.GasMeter === "Y");
     setHasWaterMeter(leaseData.WaterMeter === "Y");
 
-    // 2) Tanks array (if needed for size, bbls per inch, etc.)
-    setTankID(leaseData.Tanks?.[0]?.TankID || "");
-    setTanks(leaseData.Tanks || []);
+    //------------------------------------------------
+    // 3) Tanks Array
+    //    (Used for size, bblsPerInch, etc.)
+    //------------------------------------------------
+    const allTanks = Array.isArray(leaseData.Tanks) ? leaseData.Tanks : [];
+    setTanks(allTanks);
 
-    // 3) If lease has wells, build well gauge entries
-    if (leaseData.Wells && Array.isArray(leaseData.Wells)) {
+    // Default to first Tank’s ID if it exists
+    if (allTanks.length > 0) {
+      setTankID(allTanks[0].TankID ?? "");
+    } else {
+      setTankID("");
+    }
+
+    //------------------------------------------------
+    // 4) Wells -> Build Well Gauge Entries
+    //------------------------------------------------
+    if (Array.isArray(leaseData.Wells)) {
       const mappedWells = leaseData.Wells.map((w, idx) => ({
         WellGaugeId: 0,
         wellID: w.WellID || `Well-${idx}`,
@@ -187,40 +213,49 @@ function GaugeEntryPage() {
         SND: "",
       }));
       setWellEntries(mappedWells);
+    } else {
+      setWellEntries([]);
     }
 
-    // 4) Process DailyGauges for actual gauge data
-    if (leaseData.DailyGauges && Array.isArray(leaseData.DailyGauges)) {
+    //------------------------------------------------
+    // 5) DailyGauges -> Oil/Water Gauge Arrays
+    //------------------------------------------------
+    if (
+      Array.isArray(leaseData.DailyGauges) &&
+      leaseData.DailyGauges.length > 0
+    ) {
       const oilList = [];
       const waterList = [];
       let firstGauge = null;
 
-      console.log("DailyGauges:", leaseData.DailyGauges);
-
       leaseData.DailyGauges.forEach((dg, idx) => {
-        // Capture first gauge to set global fields
+        // Save the first gauge for “global” fields
         if (idx === 0) {
           firstGauge = dg;
         }
-        // Oil Tanks
+
+        // Find matching tank so we can store bblsPerInch
+        const matchingTank = allTanks.find((t) => t.TankID === dg.TankID);
+        const bblsPerInch = parseFloat(matchingTank?.bblsPerInch ?? "0") || 0;
+
         if (dg.TankType === "T") {
+          // Oil Tank
           oilList.push({
             GaugeID: dg.GaugeID,
             TankID: dg.TankID,
             gaugeFt: parseFloat(dg.GaugeFt || "0"),
             gaugeIn: parseFloat(dg.GaugeIn || "0"),
             overrideBbls: parseFloat(dg.OverrideBbls || "0"),
-            // ...any additional fields you need...
+            bblsPerInch, // <- important to prevent NaN
           });
-        }
-        // Water Tanks
-        else if (dg.TankType === "W") {
+        } else if (dg.TankType === "W") {
+          // Water Tank
           waterList.push({
             GaugeID: dg.GaugeID,
             TankID: dg.TankID,
             gaugeFt: parseFloat(dg.GaugeFt || "0"),
             gaugeIn: parseFloat(dg.GaugeIn || "0"),
-            // ...any additional fields you need...
+            bblsPerInch,
           });
         }
       });
@@ -229,19 +264,35 @@ function GaugeEntryPage() {
       setOilGauges(oilList);
       setWaterGauges(waterList);
 
-      // Populate global fields from first gauge
+      //------------------------------------------------
+      // 6) Global Fields from the First Gauge
+      //------------------------------------------------
       if (firstGauge) {
-        setComments(firstGauge.Comment || "");
+        setComments(firstGauge.Comment ?? "");
         setTbgPressure(parseFloat(firstGauge.TbgPressure || "0"));
         setCsgPressure(parseFloat(firstGauge.CsgPressure || "0"));
         setGasMeter(parseFloat(firstGauge.GMeter || "0"));
         setMcf(parseFloat(firstGauge.Mcf || "0"));
-        setGasDisp(firstGauge.GasDisp || "3");
+        setGasDisp(firstGauge.GasDisp ?? "3");
         setManualWater(parseFloat(firstGauge.Water || "0"));
-      }
 
-      console.log("oilList:", oilList);
-      console.log("oilGauges:", oilGauges); // NOTE: logs old state on this render
+        // If your server stores these, you can also set them:
+        setWaterMeter(parseFloat(firstGauge.WMeter || "0"));
+        setChoke(parseFloat(firstGauge.Choke || "0"));
+        setFlowRate(parseFloat(firstGauge.FlowRate || "0"));
+        setLinePressure(parseFloat(firstGauge.LinePressure || "0"));
+        setStaticPressure(parseFloat(firstGauge.StaticPressure || "0"));
+        setDiffPressure(parseFloat(firstGauge.DiffPressure || "0"));
+        setHoursOn(parseFloat(firstGauge.HoursOn || "0"));
+        setGaugeTime(firstGauge.GaugeTime ?? "12:00");
+        setPocRunTime(parseFloat(firstGauge.PocRunTime || "100"));
+        setSpcc(firstGauge.SPCC ?? "");
+        setInitialGauges(firstGauge.InitialGauges ?? "N");
+      }
+    } else {
+      // If no DailyGauges, reset arrays
+      setOilGauges([]);
+      setWaterGauges([]);
     }
   }, [leaseData]);
 
@@ -315,7 +366,7 @@ function GaugeEntryPage() {
   const [oilProduced, setOilProduced] = useState(0);
   const [oilOnHand, setOilOnHand] = useState(0);
   const [inchesProduced, setInchesProduced] = useState(0);
-  const [drawBbls, setDrawBbls] = useState(0);
+  const [drawBbls, setDrawBbls] = useState(2);
   const [soldOil, setSoldOil] = useState(0);
   const [colorCutOnHand, setColorCutOnHand] = useState(0);
 
@@ -327,54 +378,63 @@ function GaugeEntryPage() {
   const [meteredWater, setMeteredWater] = useState(0);
   const [meteredGas, setMeteredGas] = useState(0);
 
-  // Recalculate oil totals if user updates gauge
   useEffect(() => {
     let totalOilInches = 0;
     let totalOilBbls = 0;
     let totalColorCutBbls = 0;
 
     oilGauges.forEach((tank) => {
-      const inches = tank.gaugeFt * 12 + tank.gaugeIn;
-      totalOilInches += inches;
-      const bbls = inches * tank.bblsPerInch;
-      totalOilBbls += bbls;
+      const topInches = (tank.gaugeFt || 0) * 12 + (tank.gaugeIn || 0);
+      const bblsPerInch = parseFloat(tank.bblsPerInch ?? 0);
+
+      // NEW: Factor in overrideBbls if > 0
+      const overrideVal = parseFloat(tank.overrideBbls || "0");
+      const grossBbls = overrideVal > 0 ? overrideVal : topInches * bblsPerInch;
+
+      totalOilInches += topInches;
+      totalOilBbls += topInches * bblsPerInch;
+      totalOilBbls += grossBbls;
 
       if (useColorCut) {
-        const ccInches = (tank.colorCutFt || 0) * 12 + (tank.colorCutIn || 0);
-        const ccBbls = ccInches * tank.bblsPerInch;
-        totalColorCutBbls += ccBbls;
+        const cutInches = (tank.colorCutFt || 0) * 12 + (tank.colorCutIn || 0);
+        totalColorCutBbls += cutInches * bblsPerInch;
       }
     });
 
-    const netOilBbls = totalOilBbls - totalColorCutBbls;
+    let netOilBbls = totalOilBbls - totalColorCutBbls;
+    netOilBbls = Math.round(netOilBbls * 10000) / 10000;
+    totalColorCutBbls = Math.round(totalColorCutBbls * 10000) / 10000;
+    const oilInchesRounded = Math.round(totalOilInches * 10000) / 10000;
+
     setOilProduced(netOilBbls);
-    setInchesProduced(totalOilInches);
+    setInchesProduced(oilInchesRounded);
     setOilOnHand(netOilBbls);
     setColorCutOnHand(totalColorCutBbls);
-
-    // placeholders
-    setSoldOil(10.0);
-    setDrawBbls(1.5);
   }, [oilGauges, useColorCut]);
 
-  // Recalculate water totals if user updates gauge
+  // ------------------------------
+  // WATER PRODUCTION
+  // ------------------------------
   useEffect(() => {
     let totalWaterInches = 0;
     let totalWaterBbls = 0;
 
     waterGauges.forEach((tank) => {
-      const inches = (tank.gaugeFt || 0) * 12 + (tank.gaugeIn || 0);
-      const bbls = inches * tank.bblsPerInch;
-      totalWaterInches += inches;
-      totalWaterBbls += bbls;
+      const topInches = (tank.gaugeFt || 0) * 12 + (tank.gaugeIn || 0);
+      const bblsPerInch = parseFloat(tank.bblsPerInch ?? 0);
+
+      totalWaterInches += topInches;
+      totalWaterBbls += topInches * bblsPerInch;
     });
 
-    setWaterProduced(totalWaterBbls);
-    setWaterInchesProduced(totalWaterInches);
-    setWaterOnHand(totalWaterBbls);
-    setWaterHauledBbls(10);
-  }, [waterGauges]);
+    totalWaterBbls = Math.round(totalWaterBbls * 10000) / 10000;
+    const waterInchesRounded = Math.round(totalWaterInches * 10000) / 10000;
 
+    setWaterProduced(totalWaterBbls);
+    setWaterInchesProduced(waterInchesRounded);
+    setWaterOnHand(totalWaterBbls);
+    setWaterHauledBbls(10); // placeholder
+  }, [waterGauges]);
   useEffect(() => {
     setMeteredWater(waterMeter);
   }, [waterMeter, waterMeterReset]);
@@ -1031,8 +1091,13 @@ function GaugeEntryPage() {
 
   // If you have purchaser loads for this lease, filter them
   const loadsForThisPurchaser = useMemo(() => {
-    return purchaserLoads.filter((l) => l.PurchaserID === purchaserID);
-  }, [purchaserLoads, purchaserID]);
+    if (!purchaserID || !purchaserLeaseNo) return [];
+    return purchaserLoads.filter(
+      (ld) =>
+        ld.PurchaserID === purchaserID &&
+        ld.PurchaserLeaseID === purchaserLeaseNo
+    );
+  }, [purchaserID, purchaserLeaseNo, purchaserLoads]);
 
   const [pendingCount, dispatchedCount, pickedUpCount, rejectedCount] =
     useMemo(() => {
@@ -1494,6 +1559,7 @@ function GaugeEntryPage() {
                                             return updated;
                                           });
                                         }}
+                                        onFocus={(e) => e.target.select()}
                                       />
                                     </div>
                                     <div className="flex items-center gap-1">
@@ -1517,6 +1583,7 @@ function GaugeEntryPage() {
                                             return updated;
                                           });
                                         }}
+                                        onFocus={(e) => e.target.select()}
                                       />
                                     </div>
                                   </div>
@@ -1541,6 +1608,7 @@ function GaugeEntryPage() {
                                             return updated;
                                           });
                                         }}
+                                        onFocus={(e) => e.target.select()}
                                       />
                                     </div>
                                     <div className="flex items-center gap-1">
@@ -1564,6 +1632,7 @@ function GaugeEntryPage() {
                                             return updated;
                                           });
                                         }}
+                                        onFocus={(e) => e.target.select()}
                                       />
                                     </div>
                                   </div>
@@ -1592,6 +1661,7 @@ function GaugeEntryPage() {
                                             return updated;
                                           });
                                         }}
+                                        onFocus={(e) => e.target.select()}
                                       />
                                     </div>
                                     <div className="flex items-center gap-1">
@@ -1615,6 +1685,7 @@ function GaugeEntryPage() {
                                             return updated;
                                           });
                                         }}
+                                        onFocus={(e) => e.target.select()}
                                       />
                                     </div>
                                   </div>
@@ -1639,6 +1710,7 @@ function GaugeEntryPage() {
                                             return updated;
                                           });
                                         }}
+                                        onFocus={(e) => e.target.select()}
                                       />
                                     </div>
                                     <div className="flex items-center gap-1">
@@ -1662,6 +1734,7 @@ function GaugeEntryPage() {
                                             return updated;
                                           });
                                         }}
+                                        onFocus={(e) => e.target.select()}
                                       />
                                     </div>
                                   </div>
@@ -1689,6 +1762,7 @@ function GaugeEntryPage() {
                                           return updated;
                                         });
                                       }}
+                                      onFocus={(e) => e.target.select()}
                                     />
                                   </div>
                                   <div className="flex items-center gap-1">
@@ -1712,6 +1786,7 @@ function GaugeEntryPage() {
                                           return updated;
                                         });
                                       }}
+                                      onFocus={(e) => e.target.select()}
                                     />
                                   </div>
                                   <div className="flex items-center gap-1">
@@ -1734,6 +1809,7 @@ function GaugeEntryPage() {
                                           return updated;
                                         });
                                       }}
+                                      onFocus={(e) => e.target.select()}
                                     />
                                   </div>
                                   <div className="flex items-center gap-1">
@@ -1757,6 +1833,7 @@ function GaugeEntryPage() {
                                           return updated;
                                         });
                                       }}
+                                      onFocus={(e) => e.target.select()}
                                     />
                                   </div>
                                 </div>
@@ -1785,6 +1862,7 @@ function GaugeEntryPage() {
                                       return updated;
                                     });
                                   }}
+                                  onFocus={(e) => e.target.select()}
                                 />
                               </div>
                               <div className="flex items-center gap-1">
@@ -1808,6 +1886,7 @@ function GaugeEntryPage() {
                                       return updated;
                                     });
                                   }}
+                                  onFocus={(e) => e.target.select()}
                                 />
                               </div>
                             </div>
@@ -1862,6 +1941,7 @@ function GaugeEntryPage() {
                               const val = parseFloat(e.target.value || "0");
                               setTbgPressure(val);
                             }}
+                            onFocus={(e) => e.target.select()}
                           />
                         </div>
                         <div className="flex items-center gap-1">
@@ -1876,6 +1956,7 @@ function GaugeEntryPage() {
                               const val = parseFloat(e.target.value || "0");
                               setCsgPressure(val);
                             }}
+                            onFocus={(e) => e.target.select()}
                           />
                         </div>
                       </div>
@@ -1902,6 +1983,7 @@ function GaugeEntryPage() {
                         onChange={(e) =>
                           setGasMeter(parseFloat(e.target.value || "0"))
                         }
+                        onFocus={(e) => e.target.select()}
                       />
                       <select
                         className="border px-2 py-1 text-sm rounded focus:outline-blue-500"
@@ -1926,6 +2008,7 @@ function GaugeEntryPage() {
                           onChange={(e) =>
                             setMcf(parseFloat(e.target.value || "0"))
                           }
+                          onFocus={(e) => e.target.select()}
                         />
                         {showMcfAccum && (
                           <>
@@ -1939,6 +2022,7 @@ function GaugeEntryPage() {
                               onChange={(e) =>
                                 setMcfAccum(parseFloat(e.target.value || "0"))
                               }
+                              onFocus={(e) => e.target.select()}
                             />
                           </>
                         )}
@@ -1956,6 +2040,7 @@ function GaugeEntryPage() {
                                   parseFloat(e.target.value || "0")
                                 )
                               }
+                              onFocus={(e) => e.target.select()}
                             />
                           </>
                         )}
@@ -1972,6 +2057,7 @@ function GaugeEntryPage() {
                           onChange={(e) =>
                             setStaticPressure(parseFloat(e.target.value || "0"))
                           }
+                          onFocus={(e) => e.target.select()}
                         />
                         <label className="text-gray-600 font-medium">
                           Diff:
@@ -1983,6 +2069,7 @@ function GaugeEntryPage() {
                           onChange={(e) =>
                             setDiffPressure(parseFloat(e.target.value || "0"))
                           }
+                          onFocus={(e) => e.target.select()}
                         />
                         <label className="text-gray-600 font-medium">
                           Flow:
@@ -1994,6 +2081,7 @@ function GaugeEntryPage() {
                           onChange={(e) =>
                             setFlowRate(parseFloat(e.target.value || "0"))
                           }
+                          onFocus={(e) => e.target.select()}
                         />
                       </div>
 
@@ -2008,6 +2096,7 @@ function GaugeEntryPage() {
                           onChange={(e) =>
                             setChoke(parseFloat(e.target.value || "0"))
                           }
+                          onFocus={(e) => e.target.select()}
                         />
                         <label className="text-gray-600 font-medium">
                           Hrs On:
@@ -2019,6 +2108,7 @@ function GaugeEntryPage() {
                           onChange={(e) =>
                             setHoursOn(parseFloat(e.target.value || "0"))
                           }
+                          onFocus={(e) => e.target.select()}
                         />
                       </div>
 
@@ -2075,6 +2165,7 @@ function GaugeEntryPage() {
                                 return updated;
                               });
                             }}
+                            onFocus={(e) => e.target.select()}
                           />
                         </div>
                         <div className="flex items-center gap-1">
@@ -2093,6 +2184,7 @@ function GaugeEntryPage() {
                                 return updated;
                               });
                             }}
+                            onFocus={(e) => e.target.select()}
                           />
                         </div>
                       </div>
@@ -2110,6 +2202,7 @@ function GaugeEntryPage() {
                         onChange={(e) =>
                           setWaterMeter(parseFloat(e.target.value || "0"))
                         }
+                        onFocus={(e) => e.target.select()}
                       />
                       <select
                         className="border px-2 py-1 text-sm rounded focus:outline-blue-500"
@@ -2133,6 +2226,7 @@ function GaugeEntryPage() {
                       onChange={(e) =>
                         setManualWater(parseFloat(e.target.value || "0"))
                       }
+                      onFocus={(e) => e.target.select()}
                     />
                     <small>{manualWaterLabel2}</small>
                   </div>
@@ -2271,6 +2365,7 @@ function GaugeEntryPage() {
                                     return updated;
                                   });
                                 }}
+                                onFocus={(e) => e.target.select()}
                               />
                             </td>
                             <td className="border p-1">
@@ -2286,6 +2381,7 @@ function GaugeEntryPage() {
                                     return updated;
                                   });
                                 }}
+                                onFocus={(e) => e.target.select()}
                               />
                             </td>
                             <td className="border p-1">
@@ -2301,6 +2397,7 @@ function GaugeEntryPage() {
                                     return updated;
                                   });
                                 }}
+                                onFocus={(e) => e.target.select()}
                               />
                             </td>
                             <td className="border p-1">
@@ -2316,6 +2413,7 @@ function GaugeEntryPage() {
                                     return updated;
                                   });
                                 }}
+                                onFocus={(e) => e.target.select()}
                               />
                             </td>
                             <td className="border p-1">
@@ -2550,49 +2648,40 @@ function GaugeEntryPage() {
 
               {/* IMAGES SECTION */}
               <div className="bg-white border p-3 text-sm rounded-lg shadow-sm">
-                <h4 className="text-center font-semibold text-gray-700 mb-2">
-                  Images
-                </h4>
                 <div className="flex justify-between items-center">
-                  <button className="bg-gray-300 hover:bg-gray-400 px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors">
+                  <h4 className="font-semibold text-gray-700 mb-2">Images</h4>
+                  <button className="bg-blue-400 hover:bg-blue-500 text-white text-xs px-2 py-1 rounded">
                     <i className="fa fa-camera" aria-hidden="true"></i>
                     <a
                       href={`ogp_ImagesAdd.php?LeaseID=${leaseID}&GaugeDate=${gaugeDate}`}
                       target="_blank"
                       rel="noreferrer"
+                      className="ml-1"
                     >
-                      Add
+                      Add Images
                     </a>
                   </button>
-                  <a
-                    href={`ogp_Images.php?LeaseID=${leaseID}&GaugeDate=${gaugeDate}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-600 underline text-xs hover:text-blue-800 transition-colors"
-                  >
-                    View Images
-                  </a>
                 </div>
 
-                {/* SAMPLE RUN TICKET IMAGES (THUMBNAILS) */}
+                {/* SAMPLE IMAGES (THUMBNAILS) */}
                 <div className="flex gap-2 justify-center mt-2">
                   <img
-                    src="https://via.placeholder.com/60?text=RT1"
-                    alt="Sample Run Ticket 1"
+                    src="https://via.placeholder.com/60?text=IMG1"
+                    alt="Sample Image 1"
                     className="w-14 h-auto border cursor-pointer"
                     onClick={() =>
                       openImageModal(
-                        "https://via.placeholder.com/600x400?text=RT1"
+                        "https://via.placeholder.com/600x400?text=IMG1"
                       )
                     }
                   />
                   <img
-                    src="https://via.placeholder.com/60?text=RT2"
-                    alt="Sample Run Ticket 2"
+                    src="https://via.placeholder.com/60?text=IMG2"
+                    alt="Sample Image 2"
                     className="w-14 h-auto border cursor-pointer"
                     onClick={() =>
                       openImageModal(
-                        "https://via.placeholder.com/600x400?text=RT2"
+                        "https://via.placeholder.com/600x400?text=IMG2"
                       )
                     }
                   />
@@ -2797,6 +2886,7 @@ function GaugeEntryPage() {
                       ticketId: e.target.value,
                     })
                   }
+                  onFocus={(e) => e.target.select()} // <--- highlight entire text on focus
                 />
               </div>
 

@@ -1,7 +1,7 @@
 /* service-worker.js */
 importScripts("/idb.js");
 
-const CACHE_NAME = "my-app-cache-v1.1.8";
+const CACHE_NAME = "my-app-cache-v1.1.9";
 const DB_NAME = "request-queue";
 const STORE_NAME = "requests";
 const DB_VERSION = 2;
