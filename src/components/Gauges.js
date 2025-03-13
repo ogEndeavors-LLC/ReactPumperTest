@@ -8,9 +8,6 @@ import { baseUrl } from "./config.js";
 import { useUser } from "./UserContext";
 import { LastPage } from "@mui/icons-material";
 
-/**
- * MAIN COMPONENT
- */
 function GaugeEntryPage() {
   /*************************************************
    * 0) Fetch client-level flags from API
@@ -114,7 +111,6 @@ function GaugeEntryPage() {
   /*************************************************
    * 2) Basic data from the passed-in lease object
    *************************************************/
-  // We'll keep local state just as before:
   const [leaseID, setLeaseID] = useState("");
   const [leaseName, setLeaseName] = useState("");
   const [pumper, setPumper] = useState("");
@@ -139,6 +135,11 @@ function GaugeEntryPage() {
 
   useEffect(() => {
     if (!leaseData) return;
+    if (leaseData?.dailyRunTickets && leaseData.dailyRunTickets.length > 0) {
+      console.log("Found dailyRunTickets in leaseData, setting runTickets...");
+      console.log(leaseData.dailyRunTickets);
+      setRunTickets(leaseData.dailyRunTickets);
+    }
 
     console.log("Lease data:", leaseData);
 
@@ -177,13 +178,12 @@ function GaugeEntryPage() {
     setHasWaterMeter(leaseData.WaterMeter === "Y");
 
     //------------------------------------------------
-    // 3) Tanks Array
-    //    (Used for size, bblsPerInch, etc.)
+    // 3) Tanks Array (Used for size, bblsPerInch, etc.)
     //------------------------------------------------
     const allTanks = Array.isArray(leaseData.Tanks) ? leaseData.Tanks : [];
     setTanks(allTanks);
 
-    // Default to first Tank’s ID if it exists
+    // Default to first tank’s ID if it exists
     if (allTanks.length > 0) {
       setTankID(allTanks[0].TankID ?? "");
     } else {
@@ -435,6 +435,7 @@ function GaugeEntryPage() {
     setWaterOnHand(totalWaterBbls);
     setWaterHauledBbls(10); // placeholder
   }, [waterGauges]);
+
   useEffect(() => {
     setMeteredWater(waterMeter);
   }, [waterMeter, waterMeterReset]);
@@ -504,8 +505,6 @@ function GaugeEntryPage() {
   // Hard-coded "T" for Gauges By Tank
   const [selectedReport] = useState("T");
 
-  // If you had previously fetched gauge history from an API, you can do so here.
-  // Or comment it out to rely purely on passed-in data.
   useEffect(() => {
     if (selectedReport !== "T" || !leaseID) return;
     fetchRecentGaugeHistory();
@@ -855,11 +854,11 @@ function GaugeEntryPage() {
         GaugeIn: tank.gaugeIn || 0,
         TankType: "T",
       }));
-      const waterDaily = waterGauges.map((tank) => ({
-        GaugeID: tank.GaugeID || 0,
-        TankID: tank.TankID,
-        GaugeFt: tank.gaugeFt || 0,
-        GaugeIn: tank.gaugeIn || 0,
+      const waterDaily = waterGauges.map((w) => ({
+        GaugeID: w.GaugeID || 0,
+        TankID: w.TankID,
+        GaugeFt: w.gaugeFt || 0,
+        GaugeIn: w.gaugeIn || 0,
         TankType: "W",
       }));
 
@@ -1034,33 +1033,64 @@ function GaugeEntryPage() {
   });
 
   // Helpers
-  const openRunTicketModal = (existingIndex = null) => {
-    if (existingIndex !== null) {
-      const existing = runTickets[existingIndex];
-      setNewRunTicket({ ...existing });
-      setEditingRunTicketIndex(existingIndex);
+  const openRunTicketModal = (idx) => {
+    if (idx !== null) {
+      // Editing an existing run ticket
+      const existing = runTickets[idx];
+
+      // Optionally parse a ticket ID from the comment if it follows [RT#XYZ]
+      const ticketIdFromComment = parseTicketNumber(existing.Comment); // an optional helper function
+
+      setNewRunTicket({
+        gaugeid1: existing.GaugeID,
+        gaugedate: existing.GaugeDate,
+        // e.g. "15:30:00" => "15:30"
+        gaugetime: existing.GaugeTime
+          ? existing.GaugeTime.slice(0, 5)
+          : "12:00",
+        tankid: existing.TankID,
+        gravity: parseFloat(existing.Gravity),
+        temp: parseFloat(existing.Temp),
+        bsw: parseFloat(existing.BSWPct),
+        opengaugeft: parseFloat(existing.GaugeFt),
+        opengaugein: parseFloat(existing.GaugeIn),
+        ticketId: ticketIdFromComment, // The parsed ticket # (or "")
+        comments: existing.Comment, // The full original comment
+        override: existing.Override,
+        overridebbls: parseFloat(existing.OverrideBbls),
+        // etc... fill in any additional fields you track
+        optradio: "N", // "N" => Insert/Edit mode (vs "D" => Delete)
+        gaugeid2: "-1", // or your logic if you have an open/close system
+        // ...
+      });
+
+      setEditingRunTicketIndex(idx);
     } else {
-      setNewRunTicket((prev) => ({
-        ...prev,
-        lid: leaseID,
-        gdate: gaugeDate,
-        gaugedate: gaugeDate,
-        ticketId: "",
+      // Creating a brand-new run ticket
+      setNewRunTicket({
         gaugeid1: "-1",
         gaugeid2: "-1",
-        tankid: tankID,
-        opengaugeft: 0,
-        opengaugein: 0,
-        closegaugeft: 0,
-        closegaugein: 0,
-        runTicketNumber: 999,
-        disposition: "",
+        gaugedate: gaugeDate,
+        gaugetime: "15:30",
+        ticketId: "",
         comments: "",
-      }));
+        optradio: "N",
+        // fill in any other defaults...
+      });
+
       setEditingRunTicketIndex(null);
     }
+
+    // Finally, open the modal
     setShowRunTicketModal(true);
   };
+
+  function parseTicketNumber(comment) {
+    if (!comment) return "";
+    const match = comment.match(/\[RT#(.+?)\]/);
+    return match && match[1] ? match[1] : "";
+  }
+
   const closeRunTicketModal = () => setShowRunTicketModal(false);
 
   const openWaterTicketModal = (existingIndex = null) => {
@@ -1089,7 +1119,6 @@ function GaugeEntryPage() {
   };
   const closeWaterTicketModal = () => setShowWaterTicketModal(false);
 
-  // If you have purchaser loads for this lease, filter them
   const loadsForThisPurchaser = useMemo(() => {
     if (!purchaserID || !purchaserLeaseNo) return [];
     return purchaserLoads.filter(
@@ -1114,14 +1143,17 @@ function GaugeEntryPage() {
       });
       return [pending, dispatched, pickedUp, rejected];
     }, [loadsForThisPurchaser]);
+
   const loadsAsOfDateTime = moment().format("MM/DD/YY hh:mm a");
 
   /*************************************************
    * 8A) Post (Add or Update) a Run Ticket
    *************************************************/
+
   const handleRunTicketSave = async (e) => {
     e.preventDefault();
 
+    // 1) Build mergedComments (Ticket # in brackets if present)
     const runTicketNumber = newRunTicket.ticketId.trim();
     const mergedComments = runTicketNumber
       ? `[RT#${runTicketNumber}] ${newRunTicket.comments || ""}`
@@ -1132,80 +1164,181 @@ function GaugeEntryPage() {
       return;
     }
 
-    const urlParams = new URLSearchParams();
-    urlParams.append("comments", mergedComments);
-    urlParams.append("gaugedate", newRunTicket.gaugedate);
-    urlParams.append("gdate", newRunTicket.gaugedate);
-    urlParams.append("gaugetime", newRunTicket.gaugetime || "12:00");
-    urlParams.append("tickettype", newRunTicket.tickettype || "S");
-    urlParams.append("lid", newRunTicket.lid || "");
-    urlParams.append("src", newRunTicket.src || "-1");
-    urlParams.append("lact", newRunTicket.lact || "N");
-    urlParams.append("gaugeid1", newRunTicket.gaugeid1 || "-1");
-    urlParams.append("gaugeid2", newRunTicket.gaugeid2 || "-1");
-    urlParams.append("tankid", newRunTicket.tankid || tankID);
-    urlParams.append("imagefilename", newRunTicket.imagefilename || "");
-    urlParams.append("opengaugeft", newRunTicket.opengaugeft ?? 0);
-    urlParams.append("opengaugein", newRunTicket.opengaugein ?? 0);
-    urlParams.append("closegaugeft", newRunTicket.closegaugeft ?? 0);
-    urlParams.append("closegaugein", newRunTicket.closegaugein ?? 0);
-    urlParams.append("override", newRunTicket.override || "N");
-    urlParams.append("overridebbls", newRunTicket.overridebbls ?? 0);
-    urlParams.append("gravity", newRunTicket.gravity ?? 0);
-    urlParams.append("temp", newRunTicket.temp ?? 0);
-    urlParams.append("bsw", newRunTicket.bsw ?? 0);
+    // 2) Determine if editing (PATCH) or creating new (POST)
+    const isEditing =
+      newRunTicket.gaugeid1 && newRunTicket.gaugeid1 !== "-1" ? true : false;
 
-    try {
-      const resp = await fetch(`${baseUrl}/ogp_submit_rt.php`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: urlParams.toString(),
-      });
+    // 3) If editing => PATCH, else => POST
+    if (isEditing) {
+      // --- PATCH logic ---
+      const patchData = {
+        // Match dailygauges columns
+        Gravity: newRunTicket.gravity ?? 0,
+        Temp: newRunTicket.temp ?? 0,
+        BSWPct: newRunTicket.bsw ?? 0,
+        GaugeFt: newRunTicket.opengaugeft ?? 0,
+        GaugeIn: newRunTicket.opengaugein ?? 0,
+        Override: newRunTicket.override || "N",
+        OverrideBbls: newRunTicket.overridebbls ?? 0,
+        Comment: mergedComments,
+        // e.g. LMeter: newRunTicket.openlact ?? 0 (if needed)
+      };
 
-      const textResp = await resp.text();
-      let result;
       try {
-        result = JSON.parse(textResp);
-      } catch (err) {
-        result = {
-          status: "error",
-          message: textResp,
-        };
-      }
-
-      console.log("RunTicket Save response:", result);
-
-      if (
-        result.message &&
-        result.message.includes("Cannot add or update a child row")
-      ) {
-        alert(
-          "Foreign key constraint failed: Please ensure this TankID exists " +
-            "for your Lease on the server."
+        const response = await fetch(
+          `${baseUrl}/ogp_submit_rt.php?gaugeid1=${newRunTicket.gaugeid1}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(patchData),
+          }
         );
-        return;
-      }
+        const result = await response.json();
+        console.log("PATCH run ticket response:", result);
 
-      if (result.status !== "success") {
-        alert("Error saving the run ticket: " + result.message);
-        return;
-      }
+        if (result.status !== "success") {
+          alert("Error updating the run ticket: " + result.message);
+          return;
+        }
 
-      if (editingRunTicketIndex !== null) {
-        setRunTickets((prev) => {
-          const copy = [...prev];
-          copy[editingRunTicketIndex] = { ...newRunTicket };
-          return copy;
+        // If success => update local state
+        if (editingRunTicketIndex !== null) {
+          setRunTickets((prev) => {
+            const updated = [...prev];
+            updated[editingRunTicketIndex] = {
+              ...newRunTicket,
+              comments: mergedComments,
+            };
+            return updated;
+          });
+        }
+
+        // Reset newRunTicket to defaults
+        setNewRunTicket({
+          gaugeid1: "-1",
+          gaugeid2: "-1",
+          gaugedate: "",
+          gaugetime: "",
+          ticketId: "",
+          comments: "",
+          optradio: "N",
+          gravity: 0,
+          temp: 0,
+          bsw: 0,
+          opengaugeft: 0,
+          opengaugein: 0,
+          closegaugeft: 0,
+          closegaugein: 0,
+          override: "N",
+          overridebbls: 0,
         });
-      } else {
-        setRunTickets((prev) => [...prev, { ...newRunTicket }]);
+
+        closeRunTicketModal();
+      } catch (err) {
+        console.error("RunTicket PATCH error:", err);
+        alert(`PATCH failed: ${err.message}`);
       }
-      closeRunTicketModal();
-    } catch (err) {
-      console.error("RunTicket Save error:", err);
-      alert(`Failed: ${err.message}`);
+    } else {
+      // --- POST logic (new ticket) ---
+      const urlParams = new URLSearchParams();
+      urlParams.append("comments", mergedComments);
+      urlParams.append("gaugedate", newRunTicket.gaugedate);
+      urlParams.append("gdate", newRunTicket.gaugedate);
+      urlParams.append("gaugetime", newRunTicket.gaugetime || "12:00");
+      urlParams.append("tickettype", newRunTicket.tickettype || "S");
+      urlParams.append("lid", newRunTicket.lid || "");
+      urlParams.append("src", newRunTicket.src || "-1");
+      urlParams.append("lact", newRunTicket.lact || "N");
+      urlParams.append("gaugeid1", newRunTicket.gaugeid1 || "-1");
+      urlParams.append("gaugeid2", newRunTicket.gaugeid2 || "-1");
+      urlParams.append("tankid", newRunTicket.tankid || tankID);
+      urlParams.append("imagefilename", newRunTicket.imagefilename || "");
+      urlParams.append("opengaugeft", newRunTicket.opengaugeft ?? 0);
+      urlParams.append("opengaugein", newRunTicket.opengaugein ?? 0);
+      urlParams.append("closegaugeft", newRunTicket.closegaugeft ?? 0);
+      urlParams.append("closegaugein", newRunTicket.closegaugein ?? 0);
+      urlParams.append("override", newRunTicket.override || "N");
+      urlParams.append("overridebbls", newRunTicket.overridebbls ?? 0);
+      urlParams.append("gravity", newRunTicket.gravity ?? 0);
+      urlParams.append("temp", newRunTicket.temp ?? 0);
+      urlParams.append("bsw", newRunTicket.bsw ?? 0);
+
+      try {
+        const resp = await fetch(`${baseUrl}/ogp_submit_rt.php`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: urlParams.toString(),
+        });
+
+        const textResp = await resp.text();
+        let result;
+        try {
+          result = JSON.parse(textResp);
+        } catch (err) {
+          result = {
+            status: "error",
+            message: textResp,
+          };
+        }
+
+        console.log("RunTicket Save (POST) response:", result);
+
+        if (
+          result.message &&
+          result.message.includes("Cannot add or update a child row")
+        ) {
+          alert(
+            "Foreign key constraint failed: Please ensure this TankID exists " +
+              "for your Lease on the server."
+          );
+          return;
+        }
+
+        if (result.status !== "success") {
+          alert("Error saving the run ticket: " + result.message);
+          return;
+        }
+
+        // If success => update local state
+        if (editingRunTicketIndex !== null) {
+          setRunTickets((prev) => {
+            const copy = [...prev];
+            copy[editingRunTicketIndex] = { ...newRunTicket };
+            return copy;
+          });
+        } else {
+          setRunTickets((prev) => [...prev, { ...newRunTicket }]);
+        }
+
+        // Reset newRunTicket to defaults
+        setNewRunTicket({
+          gaugeid1: "-1",
+          gaugeid2: "-1",
+          gaugedate: "",
+          gaugetime: "",
+          ticketId: "",
+          comments: "",
+          optradio: "N",
+          gravity: 0,
+          temp: 0,
+          bsw: 0,
+          opengaugeft: 0,
+          opengaugein: 0,
+          closegaugeft: 0,
+          closegaugein: 0,
+          override: "N",
+          overridebbls: 0,
+        });
+
+        closeRunTicketModal();
+      } catch (err) {
+        console.error("RunTicket Save error:", err);
+        alert(`Failed: ${err.message}`);
+      }
     }
   };
 
@@ -1270,18 +1403,87 @@ function GaugeEntryPage() {
       alert(`Failed: ${err.message}`);
     }
   };
+  useEffect(() => {
+    if (!leaseID || !gaugeDate) return;
 
-  const handleDeleteRunTicket = (index) => {
+    // Call GET /ogp_submit_rt.php?lid=xxx&date=yyyy-mm-dd
+    async function fetchRunTickets() {
+      try {
+        const res = await fetch(
+          `${baseUrl}/ogp_submit_rt.php?lid=${leaseID}&date=${gaugeDate}`
+        );
+        const data = await res.json();
+
+        if (data.status === "success" && data.tickets) {
+          // data.tickets might contain an array of run-tickets (GaugeType in B, D, R, T, E, F, W, Y)
+          // You could filter them into "oil run tickets" vs "water run tickets"
+          // or simply store them all in a single state array:
+          setRunTickets(data.tickets);
+        } else {
+          console.warn("No run tickets found or error", data.message);
+          // If no tickets, keep runTickets as []
+        }
+      } catch (err) {
+        console.error("Error fetching run tickets:", err);
+      }
+    }
+
+    fetchRunTickets();
+  }, [leaseID, gaugeDate]);
+
+  async function patchRunTicket(gaugeId, partialFields) {
+    try {
+      const response = await fetch(
+        `${baseUrl}/ogp_submit_rt.php?gaugeid1=${gaugeId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(partialFields),
+        }
+      );
+      const data = await response.json();
+      if (data.status === "success") {
+        // success: update local state if needed
+        console.log("Ticket partially updated");
+      } else {
+        console.error("Partial update error:", data.message);
+        alert("Partial update error: " + data.message);
+      }
+    } catch (err) {
+      console.error("Partial update failed:", err);
+    }
+  }
+
+  async function deleteRunTicket(gaugeid1, gaugeid2) {
     if (!window.confirm("Are you sure you want to delete this run ticket?")) {
       return;
     }
-    setRunTickets((prev) => {
-      const copy = [...prev];
-      copy.splice(index, 1);
-      return copy;
-    });
-  };
 
+    try {
+      const res = await fetch(
+        `${baseUrl}/ogp_submit_rt.php?gaugeid1=${gaugeid1}&gaugeid2=${gaugeid2}`,
+        {
+          method: "DELETE",
+        }
+      );
+      const data = await res.json();
+      if (data.status === "success") {
+        // Remove from local state
+        setRunTickets((prev) =>
+          prev.filter(
+            (rt) => rt.GaugeID !== gaugeid1 && rt.GaugeID !== gaugeid2
+          )
+        );
+        console.log("Deleted successfully:", data.message);
+      } else {
+        alert("Error deleting run ticket: " + data.message);
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
+  }
   const handleDeleteWaterTicket = (index) => {
     if (!window.confirm("Are you sure you want to delete this water ticket?")) {
       return;
@@ -1495,6 +1697,7 @@ function GaugeEntryPage() {
                       Oil Tanks
                     </h4>
                     <div className="bg-white rounded shadow p-2 w-full text-sm">
+                      {/* Header Row */}
                       <div
                         className={`grid grid-cols-1 gap-2 font-semibold text-gray-700 border-b border-gray-200 pb-1 mb-2 px-2 lg:grid-cols-${
                           useColorCut ? "12" : "9"
@@ -1518,6 +1721,7 @@ function GaugeEntryPage() {
                         )}
                       </div>
 
+                      {/* Per-Tank Rows */}
                       {oilGauges.map((tank, idx) => (
                         <div
                           key={tank.TankID}
@@ -1532,12 +1736,13 @@ function GaugeEntryPage() {
                             {tank.TankID} ({tank.size})
                           </div>
 
-                          {/* If useColorCut => show top gauge and color cut, else just top gauge */}
+                          {/* Using Color Cut? */}
                           {useColorCut ? (
                             <>
                               {/* iPad layout */}
                               {isIpad ? (
                                 <div className="flex flex-row items-center justify-between w-full gap-1 px-0 lg:col-span-9">
+                                  {/* Top Gauge */}
                                   <div className="flex items-center gap-1">
                                     <div className="flex items-center gap-1">
                                       <label className="text-gray-600 font-medium">
@@ -1587,6 +1792,7 @@ function GaugeEntryPage() {
                                       />
                                     </div>
                                   </div>
+                                  {/* Color Cut */}
                                   <div className="flex items-center gap-1">
                                     <div className="flex items-center gap-1">
                                       <label className="text-gray-600 font-medium">
@@ -1894,7 +2100,7 @@ function GaugeEntryPage() {
                         </div>
                       ))}
 
-                      {/* Additional controls at the bottom of the Oil Tanks section */}
+                      {/* Extra controls for Oil Tanks */}
                       <div className="flex flex-col lg:flex-row items-center gap-2 mt-2 px-2 justify-center">
                         {use24 && (
                           <div className="flex items-center gap-1">
@@ -2233,7 +2439,7 @@ function GaugeEntryPage() {
                 </div>
               )}
 
-              {/* NOTES / WELLS / SUBMIT */}
+              {/* NOTES / SPCC / INITIAL GAUGES */}
               <div className="bg-white border p-3 rounded text-sm col-span-1 md:col-span-2 space-y-2 shadow-sm mt-3">
                 <label className="font-semibold">Notes</label>
                 <textarea
@@ -2271,6 +2477,7 @@ function GaugeEntryPage() {
                 </div>
               </div>
 
+              {/* WELLS */}
               {showWells && (
                 <div className="bg-purple-50 p-3 text-sm rounded-lg shadow-sm">
                   <div className="flex items-center justify-between">
@@ -2567,6 +2774,7 @@ function GaugeEntryPage() {
                   <h4 className="text-center font-semibold text-gray-700 mb-2">
                     Production Summaries
                   </h4>
+                  {/* Oil */}
                   {showOil && (
                     <>
                       <div className="flex justify-between bg-[#D3D3D3] p-2 text-sm rounded">
@@ -2601,6 +2809,7 @@ function GaugeEntryPage() {
                     </>
                   )}
 
+                  {/* Gas */}
                   {showGas && hasGasMeter && (
                     <div className="flex justify-between bg-[#FFFFE0] p-2 text-sm rounded mt-2">
                       <label className="font-medium">Gas Metered</label>
@@ -2608,6 +2817,7 @@ function GaugeEntryPage() {
                     </div>
                   )}
 
+                  {/* Water */}
                   {showWater && (
                     <>
                       {hasWaterMeter && (
@@ -2662,7 +2872,6 @@ function GaugeEntryPage() {
                     </a>
                   </button>
                 </div>
-
                 {/* SAMPLE IMAGES (THUMBNAILS) */}
                 <div className="flex gap-2 justify-center mt-2">
                   <img
@@ -2704,34 +2913,44 @@ function GaugeEntryPage() {
                 {runTickets.length === 0 && (
                   <p className="text-xs">No run tickets.</p>
                 )}
-                {runTickets.map((rt, idx) => (
-                  <div key={idx} className="text-xs border rounded p-2 mb-2">
-                    <div className="font-bold">
-                      RT #{rt.ticketId} &nbsp; {rt.gaugetime} &nbsp; Open:{" "}
-                      {rt.opengaugeft} ft / {rt.opengaugein} in &nbsp; Close:{" "}
-                      {rt.closegaugeft} ft / {rt.closegaugein} in
+                {runTickets.map((rt, idx) => {
+                  // Preserve the "foundTicketId" logic from your new changes
+                  let foundTicketId = "";
+                  if (rt.comments && rt.comments.startsWith("[RT#")) {
+                    const match = rt.comments.match(/\[RT#(.+?)\]/);
+                    if (match && match[1]) {
+                      foundTicketId = match[1];
+                    }
+                  }
+                  return (
+                    <div key={idx} className="text-xs border rounded p-2 mb-2">
+                      <div className="font-bold">
+                        RT #{foundTicketId || rt.ticketId} &nbsp; {rt.gaugetime}{" "}
+                        &nbsp; Open {rt.opengaugeft} ft / {rt.opengaugein} in
+                        &nbsp; Close {rt.closegaugeft} ft / {rt.closegaugein} in
+                      </div>
+                      <div className="mt-1 ml-4 italic">
+                        Gravity={rt.gravity}, Temp={rt.temp}, BSW={rt.bsw}
+                        <br />
+                        Comments: {rt.comments}
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          className="bg-yellow-200 hover:bg-yellow-300 px-2 py-1 rounded text-xs"
+                          onClick={() => openRunTicketModal(idx)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="bg-red-200 hover:bg-red-300 px-2 py-1 rounded text-xs"
+                          onClick={() => deleteRunTicket(idx)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                    <div className="mt-1 ml-4 italic">
-                      Gravity={rt.gravity}, Temp={rt.temp}, BSW={rt.bsw}
-                      <br />
-                      Comments: {rt.comments}
-                    </div>
-                    <div className="mt-2 flex gap-2">
-                      <button
-                        className="bg-yellow-200 hover:bg-yellow-300 px-2 py-1 rounded text-xs"
-                        onClick={() => openRunTicketModal(idx)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="bg-red-200 hover:bg-red-300 px-2 py-1 rounded text-xs"
-                        onClick={() => handleDeleteRunTicket(idx)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* WATER TICKETS */}
@@ -2842,85 +3061,424 @@ function GaugeEntryPage() {
       {showRunTicketModal && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50 p-4">
           <div className="bg-white w-full max-w-xl p-4 rounded shadow-lg relative">
+            {/* Close Button */}
             <button
               onClick={closeRunTicketModal}
               className="absolute top-2 right-2 text-gray-400 hover:text-red-500"
             >
               <i className="fa fa-times" aria-hidden="true"></i>
             </button>
-            <h2 className="text-lg font-semibold mb-2">
-              {editingRunTicketIndex !== null ? "Edit" : "Add"} Run Ticket
-            </h2>
 
-            {/* SAMPLE IMAGE THUMBNAILS */}
-            <div className="flex gap-2 justify-center mb-3">
-              <img
-                src="https://via.placeholder.com/60?text=RT1"
-                alt="RT1"
-                className="w-14 h-auto border cursor-pointer"
-                onClick={() =>
-                  openImageModal("https://via.placeholder.com/600x400?text=RT1")
-                }
-              />
-              <img
-                src="https://via.placeholder.com/60?text=RT2"
-                alt="RT2"
-                className="w-14 h-auto border cursor-pointer"
-                onClick={() =>
-                  openImageModal("https://via.placeholder.com/600x400?text=RT2")
-                }
-              />
-            </div>
+            {/* Title */}
+            <h2 className="text-lg font-semibold mb-2">Run Ticket Entry</h2>
 
             <form onSubmit={handleRunTicketSave} className="space-y-2 text-sm">
+              {/* Hidden fields */}
+              <input type="hidden" name="src" value={newRunTicket.src} />
+              <input type="hidden" name="lact" value={newRunTicket.lact} />
+              <input type="hidden" name="lid" value={newRunTicket.lid} />
+              <input type="hidden" name="gdate" value={newRunTicket.gdate} />
+              <input
+                type="hidden"
+                name="gaugeid1"
+                value={newRunTicket.gaugeid1}
+              />
+              <input
+                type="hidden"
+                name="gaugeid2"
+                value={newRunTicket.gaugeid2}
+              />
+              <input
+                type="hidden"
+                name="imagefilename"
+                value={newRunTicket.imagefilename}
+              />
+
+              {/* Action (Insert/Edit vs Delete) */}
               <div>
-                <label className="block font-semibold">Run Ticket #:</label>
-                <input
-                  type="text"
-                  className="border rounded p-1 w-full"
-                  placeholder="e.g. 1050-2"
-                  value={newRunTicket.ticketId}
-                  onChange={(e) =>
-                    setNewRunTicket({
-                      ...newRunTicket,
-                      ticketId: e.target.value,
-                    })
-                  }
-                  onFocus={(e) => e.target.select()} // <--- highlight entire text on focus
-                />
+                <label className="block font-semibold mb-1">Action</label>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="optradio"
+                      className="mr-1"
+                      value="N"
+                      checked={newRunTicket.optradio === "N"}
+                      onChange={() =>
+                        setNewRunTicket({ ...newRunTicket, optradio: "N" })
+                      }
+                    />
+                    Insert/Edit
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="optradio"
+                      className="mr-1"
+                      value="D"
+                      checked={newRunTicket.optradio === "D"}
+                      onChange={() =>
+                        setNewRunTicket({ ...newRunTicket, optradio: "D" })
+                      }
+                    />
+                    Delete
+                  </label>
+                </div>
               </div>
 
-              <div>
-                <label className="block font-semibold">Comments:</label>
-                <textarea
-                  className="border rounded p-1 w-full"
-                  rows={2}
-                  placeholder="Any notes..."
-                  value={newRunTicket.comments}
-                  onChange={(e) =>
-                    setNewRunTicket({
-                      ...newRunTicket,
-                      comments: e.target.value,
-                    })
-                  }
-                />
+              {/* Date / Time / Gauge Type */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold mb-1">Date</label>
+                  <input
+                    type="date"
+                    name="gaugedate"
+                    className="border rounded p-1 w-full"
+                    value={newRunTicket.gaugedate || ""}
+                    onChange={(e) =>
+                      setNewRunTicket({
+                        ...newRunTicket,
+                        gaugedate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Time</label>
+                  <input
+                    type="time"
+                    name="gaugetime"
+                    className="border rounded p-1 w-full"
+                    value={newRunTicket.gaugetime || ""}
+                    onChange={(e) =>
+                      setNewRunTicket({
+                        ...newRunTicket,
+                        gaugetime: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Gauge Type</label>
+                  <select
+                    name="gaugetype"
+                    className="border rounded p-1 w-full"
+                    value={newRunTicket.gaugetype}
+                    onChange={(e) =>
+                      setNewRunTicket({
+                        ...newRunTicket,
+                        gaugetype: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="B">Run Before Pumper</option>
+                    <option value="R">Run After Pumper</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2 mt-2">
+              {/* Comment (Ticket #) & Product */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold mb-1">
+                    Comment (Ticket #)
+                  </label>
+                  <input
+                    type="text"
+                    name="comments"
+                    className="border rounded p-1 w-full"
+                    placeholder="e.g. 1050-2"
+                    value={newRunTicket.ticketId}
+                    onChange={(e) =>
+                      setNewRunTicket({
+                        ...newRunTicket,
+                        ticketId: e.target.value,
+                      })
+                    }
+                    onFocus={(e) => e.target.select()}
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Product</label>
+                  <select
+                    name="tickettype"
+                    className="border rounded p-1 w-full"
+                    value={newRunTicket.tickettype}
+                    onChange={(e) =>
+                      setNewRunTicket({
+                        ...newRunTicket,
+                        tickettype: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="S">Sell Oil</option>
+                    <option value="B">BS&amp;W</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tank / or LACT Meter */}
+              <div>
+                <label className="block font-semibold mb-1">Tank</label>
+                <select
+                  name="tankid"
+                  className="border rounded p-1 w-full"
+                  value={newRunTicket.tankid}
+                  onChange={(e) =>
+                    setNewRunTicket({ ...newRunTicket, tankid: e.target.value })
+                  }
+                >
+                  {tanks.map((tank) => (
+                    <option key={tank.TankID} value={tank.TankID}>
+                      {tank.TankID}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Open / Close Gauge or Meter */}
+              <div className="grid grid-cols-2 gap-2">
+                {showLACT ? (
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Open Meter
+                    </label>
+                    <input
+                      type="number"
+                      name="openlact"
+                      className="border rounded p-1 w-full"
+                      value={newRunTicket.openlact || ""}
+                      onChange={(e) =>
+                        setNewRunTicket({
+                          ...newRunTicket,
+                          openlact: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Open Gauge
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        name="opengaugeft"
+                        className="border rounded p-1 w-16"
+                        placeholder="ft"
+                        value={newRunTicket.opengaugeft ?? ""}
+                        onChange={(e) =>
+                          setNewRunTicket({
+                            ...newRunTicket,
+                            opengaugeft: parseFloat(e.target.value || "0"),
+                          })
+                        }
+                      />
+                      <input
+                        type="number"
+                        name="opengaugein"
+                        className="border rounded p-1 w-16"
+                        placeholder="in"
+                        step="0.25"
+                        value={newRunTicket.opengaugein ?? ""}
+                        onChange={(e) =>
+                          setNewRunTicket({
+                            ...newRunTicket,
+                            opengaugein: parseFloat(e.target.value || "0"),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {showLACT ? (
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Close Meter
+                    </label>
+                    <input
+                      type="number"
+                      name="closelact"
+                      className="border rounded p-1 w-full"
+                      value={newRunTicket.closelact || ""}
+                      onChange={(e) =>
+                        setNewRunTicket({
+                          ...newRunTicket,
+                          closelact: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Close Gauge
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        name="closegaugeft"
+                        className="border rounded p-1 w-16"
+                        placeholder="ft"
+                        value={newRunTicket.closegaugeft ?? ""}
+                        onChange={(e) =>
+                          setNewRunTicket({
+                            ...newRunTicket,
+                            closegaugeft: parseFloat(e.target.value || "0"),
+                          })
+                        }
+                      />
+                      <input
+                        type="number"
+                        name="closegaugein"
+                        className="border rounded p-1 w-16"
+                        placeholder="in"
+                        step="0.25"
+                        value={newRunTicket.closegaugein ?? ""}
+                        onChange={(e) =>
+                          setNewRunTicket({
+                            ...newRunTicket,
+                            closegaugein: parseFloat(e.target.value || "0"),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Override */}
+              <div>
+                <label className="block font-semibold mb-1">
+                  Override Bbls?
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    name="override"
+                    className="border rounded p-1"
+                    value={newRunTicket.override}
+                    onChange={(e) =>
+                      setNewRunTicket({
+                        ...newRunTicket,
+                        override: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="N">Calculate</option>
+                    <option value="Y">Override</option>
+                  </select>
+                  {newRunTicket.override === "Y" && (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        name="overridebbls"
+                        className="border p-1 w-20 text-right rounded bg-[#FFE8E8]"
+                        placeholder="bbls"
+                        value={newRunTicket.overridebbls ?? ""}
+                        onChange={(e) =>
+                          setNewRunTicket({
+                            ...newRunTicket,
+                            overridebbls: parseFloat(e.target.value || "0"),
+                          })
+                        }
+                        onFocus={(e) => e.target.select()}
+                      />
+                      <small>ex: backgauge</small>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Gravity / Temp / BSW */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold mb-1">Gravity</label>
+                  <input
+                    type="number"
+                    name="gravity"
+                    className="border rounded p-1 w-full"
+                    step="0.1"
+                    placeholder="e.g. 40.0"
+                    value={newRunTicket.gravity ?? ""}
+                    onChange={(e) =>
+                      setNewRunTicket({
+                        ...newRunTicket,
+                        gravity: parseFloat(e.target.value || "0"),
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Temp (°F)</label>
+                  <input
+                    type="number"
+                    name="temp"
+                    className="border rounded p-1 w-full"
+                    placeholder="°F"
+                    value={newRunTicket.temp ?? ""}
+                    onChange={(e) =>
+                      setNewRunTicket({
+                        ...newRunTicket,
+                        temp: parseFloat(e.target.value || "0"),
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">BS&amp;W %</label>
+                  <input
+                    type="number"
+                    name="bsw"
+                    className="border rounded p-1 w-full"
+                    step="0.0001"
+                    placeholder="e.g. 0.3"
+                    value={newRunTicket.bsw ?? ""}
+                    onChange={(e) =>
+                      setNewRunTicket({
+                        ...newRunTicket,
+                        bsw: parseFloat(e.target.value || "0"),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Optional Image Upload */}
+              {useImages && (
+                <div>
+                  <label className="block font-semibold mb-1">
+                    Attach Image
+                  </label>
+                  <input type="file" accept=".jpg, .jpeg, .png" />
+                  {newRunTicket.previewSrc && (
+                    <div className="mt-1">
+                      <img
+                        src={newRunTicket.previewSrc}
+                        alt="Preview"
+                        style={{ height: 50, width: 50 }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex justify-end gap-2 mt-3">
                 <button
                   type="button"
-                  className="bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded text-sm"
+                  className="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded"
                   onClick={closeRunTicketModal}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
                 >
-                  {editingRunTicketIndex !== null
-                    ? "Update Ticket"
-                    : "Save Ticket"}
+                  {editingRunTicketIndex !== null ? "Update Ticket" : "Submit"}
                 </button>
               </div>
             </form>
